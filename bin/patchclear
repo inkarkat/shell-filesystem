@@ -1,0 +1,2 @@
+#!/bin/bash
+exec find "${1:-.}" \( -name '*.rej' -o -name '*.orig' \) -print -delete
