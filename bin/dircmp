@@ -7,7 +7,7 @@ readonly dir2=${2:?}
 readonly absDir2=$(readlink -nf -- "${dir2}")
 pushd "$1" >/dev/null || exit $?
 trap 'popd >/dev/null' EXIT
-find . -type f -print | { while IFS=$'\n' read filespec
+find . -type f -print | { while IFS=$'\n' read -r filespec
 do
     typeset filespec2="${absDir2}/${filespec#./}"
     if [ ! -e "${filespec2}" ]; then
