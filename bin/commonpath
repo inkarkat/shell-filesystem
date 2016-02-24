@@ -1,0 +1,45 @@
+#!/bin/bash
+###############################################################################
+##
+# FILE:		commonpath
+# PRODUCT:	tools
+# AUTHOR:	Ingo Karkat <ingo@karkat.de>
+# DATE CREATED:	14-Jun-2013
+#
+###############################################################################
+# CONTENTS:
+#
+# SOURCE: https://github.com/l0b0/tilde/blob/master/.bash_aliases#L64
+#
+# REMARKS:
+#
+# @(#)commonpath	001	(14-Jun-2013)	tools
+###############################################################################
+
+if [ $# -eq 0 ]; then
+    exit 2
+elif [ $# -eq 1 ]; then
+    printf '%s\n' "${1%/*}"
+    exit
+fi
+
+# Remove repeated slashes.
+for param
+do
+    param="$(printf %s. "$1" | tr -s "/")"
+    set -- "$@" "${param%.}"
+    shift
+done
+
+common_path="$1"
+shift
+
+for param
+do
+    while case "${param%/}/" in "${common_path%/}/"*) false;; esac; do
+	new_common_path="${common_path%/*}"
+	[ "$new_common_path" = "$common_path" ] && exit 1 # Dead end
+	common_path="$new_common_path"
+    done
+done
+printf '%s\n' "$common_path"
