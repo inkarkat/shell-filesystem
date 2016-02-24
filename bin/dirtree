@@ -1,0 +1,48 @@
+#!/bin/sh
+
+#######################################################
+#  UNIX TREE                                          #
+#  Version: 2.2                                       #
+#  /^-- 20080207: Adapted to Windows 'tree.exe' output. 
+#  By Dem Pilafian                                    #
+#  File: ~/apps/tree/tree.sh                          #
+#                                                     #
+#  Displays Structure of Directory Hierarchy          #
+#  -------------------------------------------------  #
+#  This tiny script uses "ls", "grep", and "sed"      #
+#  in a single command to show the nesting of         #
+#  sub-directories.                                   #
+#                                                     #
+#  Setup:                                             #
+#     % cd ~/apps/tree                                #
+#     % chmod u+x tree.sh                             #
+#     % ln -s ~/apps/tree/tree.sh ~/bin/tree          #
+#                                                     #
+#  Usage:                                             #
+#     % tree [directory]                              #
+#                                                     #
+#  Examples:                                          #
+#     % tree                                          #
+#     % tree /etc/opt                                 #
+#     % tree ..                                       #
+#                                                     #
+#  Public Domain Software -- Free to Use as You Like  #
+#  http://www.centerkey.com/tree                      #
+#######################################################
+
+echo
+if [ "$1" != "" ]  #if parameter exists, use as base folder
+   then cd "$1"
+   fi
+pwd
+ls -R | grep ":$" |   \
+   sed -e 's/:$//' -e 's/[^\/]*\//    /g' -e 's/^\(\(    \)*\)    /\1|---/'
+   #perl -lpe 's/:$//; s/[^\/]*\//    /g; s/^((?:    )*)    /$1|---/; '
+# 1st sed: remove colons
+# 2nd sed: replace higher level folder names with indent of 4 spaces
+# 3th sed: replace last indent with '|---'
+if [ `ls -F -1 | grep "/" | wc -l` = 0 ]   # check if no folders
+   then echo "No subdirectories exist. "
+   fi
+echo
+exit
