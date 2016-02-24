@@ -1,0 +1,22 @@
+#!/bin/bash
+# convert chmod octal permission args to equivalent setfacl args
+# Source: http://superuser.com/a/877937/117820
+
+ARGS=() ; FILES=()
+while [ $# -gt 0 ]; do
+  A=$1 ; shift
+  case "$A" in
+  600|0600) ARGS+=("u::rw-,g::---,o::---") ;;
+  640|0640) ARGS+=("u::rw-,g::r--,o::---") ;;
+  644|0644) ARGS+=("u::rw-,g::r--,o::r--") ;;
+  700|0700) ARGS+=("u::rwx,g::---,o::---") ;;
+  *) if [ -e "$A" ]; then FILES+=( "$A" ) ; else
+    echo "unrecognized arg [$A]" 1>&2
+    exit 1
+  fi
+  ;;
+  esac
+done
+for F in "${FILES[@]}" ; do
+  setfacl -s "${ARGS[@]}" "$F"
+done
