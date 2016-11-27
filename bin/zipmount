@@ -1,0 +1,48 @@
+#!/bin/bash
+# Source: http://vi.stackexchange.com/a/4685/970
+
+printUsage()
+{
+    cat <<HELPTEXT
+Mount the passed ZIP file as a (temporary) directory, and print that directory name.
+Usage: "$(basename "$1")" [-u|--unmount] [-q|--quiet] ZIP-FILE [-?|-h|--help]
+HELPTEXT
+}
+
+action=mount
+isQuiet=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--unmount|-u)	shift; action=unmount;;
+	--quiet|-q)	shift; isQuiet=t;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+[ $# -eq 1 ] || { printUsage "$0"; exit 2; }
+readonly FILESPEC="$1"
+TMPDIR="${TEMP:-/tmp}/$(pathAsFilename --encode "$FILESPEC")"
+
+case "$action" in
+    mount)
+	[ -r "$FILESPEC" ] || { echo >&2 "ERROR: $FILESPEC does not exist"; exit 2; }
+	[ ! -d "$FILESPEC" ] || { echo >&2 "ERROR: $FILESPEC is not a file"; exit 2; }
+	mkdir -p "$TMPDIR" || exit $?
+
+	fuse-zip "$FILESPEC" "$TMPDIR" || exit $?
+
+	[ "$isQuiet" ] || printf >&2 '%s mounted. Apply any changes / unmount via either\n    fusermount -u %q\n    %q -u %s\n' "$FILESPEC" "$TMPDIR" "$(basename -- "$0")" "$FILESPEC"
+	printf '%s\n' "$TMPDIR"
+	;;
+    unmount)
+	[ -d "$TMPDIR" ] || { echo >&2 "ERROR: $FILESPEC is not mounted at $TMPDIR"; exit 1; }
+
+	fusermount -u "$TMPDIR" && rmdir "$TMPDIR"
+	;;
+    *)
+	printf >&2 'ASSERT: Invalid action: %s\n' "$action"
+	;;
+esac
