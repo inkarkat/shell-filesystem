@@ -1,0 +1,30 @@
+#!/bin/bash
+# Source:
+#   https://unix.stackexchange.com/questions/22870/case-insensitive-search-of-duplicate-file-names
+
+printUsage()
+{
+    cat <<HELPTEXT
+List files that differ only in case, but are otherwise identical.
+HELPTEXT
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-r|--recursive] [-z, --zero-terminated] [FILE, ...] [-?|-h|--help]'
+}
+
+isRecursive=
+typeset -a findArgs=()
+typeset -a zeroArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--recursive|-r)	shift; isRecursive=t;;
+	--zero-terminated|-z)	shift; findArgs=(-print0); zeroArgs=(-z);;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+[ "$isRecursive" ] || findArgs+=(-maxdepth 1)
+[ $# -eq 0 ] && set -- .
+
+find "$@" "${findArgs[@]}" | sort -f "${zeroArgs[@]}" | uniq -di "${zeroArgs[@]}"
