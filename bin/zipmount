@@ -5,7 +5,8 @@ printUsage()
 {
     cat <<HELPTEXT
 Mount the passed ZIP file as a (temporary) directory, and print that directory name.
-Usage: "$(basename "$1")" [-u|--unmount] [-q|--quiet] ZIP-FILE [-?|-h|--help]
+Usage: "$(basename "$1")" [-q|--quiet] ZIP-FILE [-?|-h|--help]
+Usage: "$(basename "$1")" -u|--unmount [-q|--quiet] ZIP-FILE|DIRECTORY [-?|-h|--help]
 HELPTEXT
 }
 
@@ -24,20 +25,27 @@ do
 done
 [ $# -eq 1 ] || { printUsage "$0"; exit 2; }
 readonly FILESPEC="$1"
-TMPDIR="${TEMP:-/tmp}/$(pathAsFilename --encode "$FILESPEC")"
 
 case "$action" in
     mount)
 	[ -r "$FILESPEC" ] || { echo >&2 "ERROR: $FILESPEC does not exist"; exit 2; }
 	[ ! -d "$FILESPEC" ] || { echo >&2 "ERROR: $FILESPEC is not a file"; exit 2; }
+
+	TMPDIR="${TEMP:-/tmp}/$(pathAsFilename --encode "$FILESPEC")"
 	mkdir -p "$TMPDIR" || exit $?
 
 	fuse-zip "$FILESPEC" "$TMPDIR" || exit $?
 
-	[ "$isQuiet" ] || printf >&2 '%s mounted. Apply any changes / unmount via either\n    fusermount -u %q\n    %q -u %s\n' "$FILESPEC" "$TMPDIR" "$(basename -- "$0")" "$FILESPEC"
+	[ "$isQuiet" ] || printf >&2 '%s mounted. Apply any changes / unmount via either\n    fusermount -u %q && rmdir %q\n    %q -u %s\n' "$FILESPEC" "$TMPDIR" "$TMPDIR" "$(basename -- "$0")" "$FILESPEC"
 	printf '%s\n' "$TMPDIR"
 	;;
     unmount)
+	if [ -d "$FILESPEC" ]; then
+	    TMPDIR="$FILESPEC"
+	else
+	    TMPDIR="${TEMP:-/tmp}/$(pathAsFilename --encode "$FILESPEC")"
+	fi
+
 	[ -d "$TMPDIR" ] || { echo >&2 "ERROR: $FILESPEC is not mounted at $TMPDIR"; exit 1; }
 
 	fusermount -u "$TMPDIR" && rmdir "$TMPDIR"
