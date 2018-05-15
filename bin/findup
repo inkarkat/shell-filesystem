@@ -1,7 +1,18 @@
-#!/bin/sh
+#!/bin/bash
 
+printUsage()
+{
+    cat <<HELPTEXT
+Locate a FILE or matches for 'GLOB' in parent directories (up to the root
+directory), and print its / their full path(s).
+HELPTEXT
+printf 'Usage: %q %s\n' "$(basename "$1")" "FILE|'GLOB' [, ...] [-?|-h|--help]"
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+esac
 if [ $# -eq 0 ]; then
-    echo >&2 "$(basename -- "$0") <file>|'<glob>' [, ...]"
+    printUsage "$0"
     exit 2
 fi
 
