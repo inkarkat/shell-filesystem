@@ -36,7 +36,7 @@ case "$action" in
 
 	fuse-zip "$FILESPEC" "$TMPDIR" || exit $?
 
-	[ "$isQuiet" ] || printf >&2 '%s mounted. Apply any changes / unmount via either\n    fusermount -u %q && rmdir %q\n    %q -u %s\n' "$FILESPEC" "$TMPDIR" "$TMPDIR" "$(basename -- "$0")" "$FILESPEC"
+	[ "$isQuiet" ] || printf >&2 '%s mounted. Apply any changes / unmount via either\n    fusermount -u %q && rmdir %q\n    popd; %q -u %s\n' "$FILESPEC" "$TMPDIR" "$TMPDIR" "$(basename -- "$0")" "$FILESPEC"
 	printf '%s\n' "$TMPDIR"
 	;;
     unmount)
