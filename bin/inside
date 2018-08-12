@@ -1,0 +1,46 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+Test whether the current working directory or passed dir-/filespec is inside a
+directory tree.
+Usage: "$(basename "$1")" dirspec [file] [-?|-h|--help]
+HELPTEXT
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+esac
+[ $# -eq 0 -o $# -gt 2 ] && { printUsage "$0"; exit 2; }
+
+readonly dirspec=$1
+shift
+if [ $# -gt 0 ]; then
+    readonly file=$1
+else
+    readonly file=$PWD
+fi
+
+# https://github.com/dominictarr/JSON.sh/pull/2#issuecomment-2526006
+readlinkEmulation()
+{
+    cd "$(dirname $1)"
+    local filename=$(basename $1)
+    if [ -h "$filename" ]; then
+	readlinkEmulation "$(readlink $filename)"
+    else
+	printf %s "$(pwd -P)/${filename}"
+    fi
+}
+readlinkWrapper()
+{
+    readlink -nf "$@" 2>/dev/null || readlinkEmulation "$@"
+}
+
+readonly canonicalDirspec=$(readlinkWrapper "$dirspec")
+readonly canonicalFile=$(readlinkWrapper "$file")
+
+case "${canonicalFile}/" in
+    "${canonicalDirspec}"/*) exit 0;;
+    *)			     exit 1;;
+esac
