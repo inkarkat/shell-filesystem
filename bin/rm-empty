@@ -1,0 +1,122 @@
+#!/bin/bash
+
+printShortUsage()
+{
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--force] [-q|--quiet|-v|--verbose] [--] [FILE, ...] [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Remove files and directories that are empty.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --force|-f	    Ignore nonexistent files and arguments.
+    --quiet|-q	    Don't inform about the number of removed files.
+    --verbose|-v    Print every empty file and directory.
+
+Example:
+HELPTEXT
+    printf '%q %s\n' "$(basename "$1")" '/tmp/foobar'
+}
+
+typeset -a rmArguments=()
+typeset isQuiet=
+typeset isVerbose=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--force|-f)	shift; rmArguments+=("$1");;
+	--quiet|-q)	shift; isQuiet=t;;
+	--verbose|-v)	shift; isVerbose=t;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+[ $# -eq 0 ] && { printUsage "$0"; exit 2; }
+
+typeset -a emptyFiles=()
+typeset -a directories=()
+
+for filespec
+do
+    if [ -d "$filespec" ]; then
+	directories+=("$filespec")
+    else
+	[ -r "$filespec" -a ! -s "$filespec" ] && emptyFiles+=("$filespec")
+    fi
+done
+
+status=0
+readonly emptyFileNum=${#emptyFiles[@]}
+if [ $emptyFileNum -gt 0 ]; then
+    rm "${rmArguments[@]}" -- "${emptyFiles[@]}" || status=$?
+fi
+
+
+
+# Check the directories only now, some may have become empty by the previous
+# removal of empty files. As directories can become empty by removing contained
+# empty directories, we need to iterate here.
+typeset -a emptyDirectories=()
+while :
+do
+    typeset -a emptyDirectoryBatch=()
+    typeset -a remainingDirectories=()
+
+    for dirspec in "${directories[@]}"
+    do
+	if (shopt -s nullglob dotglob; f=("${dirspec%/}"/*); ((${#f[@]}))); then
+	    remainingDirectories+=("$dirspec")
+	else
+	    emptyDirectoryBatch+=("${dirspec%/}/")
+	fi
+    done
+    if [ ${#emptyDirectoryBatch[@]} -gt 0 ]; then
+	rm --dir "${rmArguments[@]}" -- "${emptyDirectoryBatch[@]}" || status=$?
+	emptyDirectories+=("${emptyDirectoryBatch[@]}")
+    else
+	break
+    fi
+
+    directories=("${remainingDirectories[@]}")
+done
+readonly emptyDirectoryNum=${#emptyDirectories[@]}
+
+
+
+if [ ! "$isQuiet" ]; then
+    case $emptyFileNum in
+	0) fileMessage=;;
+	1) fileMessage="1 empty file";;
+	*) fileMessage="$emptyFileNum empty files";;
+    esac
+    case $emptyDirectoryNum in
+	0) directoryMessage=;;
+	1) directoryMessage="1 empty directory";;
+	*) directoryMessage="$emptyDirectoryNum empty directories";;
+    esac
+    [ $emptyFileNum -eq 0 -o $emptyDirectoryNum -eq 0 ] && joiner= || joiner=' and '
+    [ "$isVerbose" ] && combiner=':' || combiner='.'
+
+    if [ $emptyFileNum -eq 0 -a $emptyDirectoryNum -eq 0 ]; then
+	printf 'No empty files or directories.\n'
+    else
+	printf '%s%s%s%s\n' "$fileMessage" "$joiner" "$directoryMessage" "$combiner"
+	[ "$isVerbose" ] && printf '%s\n' "${emptyFiles[@]}" "${emptyDirectories[@]}"
+    fi
+fi
+
+exit $status
