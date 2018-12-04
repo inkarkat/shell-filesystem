@@ -1,0 +1,30 @@
+#!/bin/bash
+set -e # Terminate the script at first error.
+
+: ${GET_EXECUTABLE_DETAILS_FOR_DIR_MAX_SHOW_COMMANDS:=7}
+cd "${1:?}"
+
+executableCnt=0
+executableDetails=
+for filename in *
+do
+    [ ! -d "$filename" -a -x "$filename" ] || continue
+
+    if [ $executableCnt -lt $GET_EXECUTABLE_DETAILS_FOR_DIR_MAX_SHOW_COMMANDS ]; then
+	executableDetails="${executableDetails}${executableDetails:+, }$filename"
+    elif [ $executableCnt -eq $GET_EXECUTABLE_DETAILS_FOR_DIR_MAX_SHOW_COMMANDS ]; then
+	executableDetails="${executableDetails}, ..."
+    fi
+
+    let executableCnt+=1
+done
+
+executableCntPlural=s
+executableCntSuffix=': '
+case "$executableCnt" in
+    0)	executableCnt='No'
+	executableCntSuffix='.'
+	;;
+    1)	executableCntPlural=;;
+esac
+printf '%s command%s available%s%s\n' "$executableCnt" "$executableCntPlural" "$executableCntSuffix" "$executableDetails"
