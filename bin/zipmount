@@ -5,9 +5,9 @@ printUsage()
 {
     cat <<HELPTEXT
 Mount the passed ZIP file as a (temporary) directory, and print that directory name.
-Usage: "$(basename "$1")" [-q|--quiet] ZIP-FILE [-?|-h|--help]
-Usage: "$(basename "$1")" -u|--unmount [-q|--quiet] ZIP-FILE|DIRECTORY [-?|-h|--help]
 HELPTEXT
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-q|--quiet] ZIP-FILE [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '-u|--unmount [-q|--quiet] ZIP-FILE|DIRECTORY [-?|-h|--help]'
 }
 
 action=mount
@@ -23,13 +23,26 @@ do
 	*)		break;;
     esac
 done
-[ $# -eq 1 ] || { printUsage "$0" >&2; exit 2; }
+if ! [ $# -eq 1 ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
 readonly FILESPEC="$1"
 
 case "$action" in
     mount)
-	[ -r "$FILESPEC" ] || { echo >&2 "ERROR: $FILESPEC does not exist"; exit 2; }
-	[ ! -d "$FILESPEC" ] || { echo >&2 "ERROR: $FILESPEC is not a file"; exit 2; }
+	if ! [ -r "$FILESPEC" ]; then
+	    echo >&2 "ERROR: $FILESPEC does not exist"
+	    echo >&2
+	    printUsage "$0" >&2
+	    exit 2
+	fi
+	if ! [ ! -d "$FILESPEC" ]; then
+	    echo >&2 "ERROR: $FILESPEC is not a file"
+	    echo >&2
+	    printUsage "$0" >&2
+	    exit 2
+	fi
 
 	TMPDIR="${TEMP:-/tmp}/$(pathAsFilename --encode "$FILESPEC")"
 	mkdir -p "$TMPDIR" || exit $?
