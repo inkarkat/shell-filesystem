@@ -23,7 +23,7 @@ do
 	*)		break;;
     esac
 done
-[ $# -eq 1 ] || { printUsage "$0"; exit 2; }
+[ $# -eq 1 ] || { printUsage "$0" >&2; exit 2; }
 readonly FILESPEC="$1"
 
 case "$action" in
