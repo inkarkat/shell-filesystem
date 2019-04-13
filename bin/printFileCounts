@@ -22,10 +22,15 @@ do
     files=("$dir"/*)
 
     if [ ${#files[@]} -gt 0 ]; then
-	name="$(basename -- "$dir")"
-	preposition='in'; [[ "$name" =~ ^[a-z]+$ ]] && preposition='to'
-	printf -v r '%d %s %s' "${#files[@]}" "$preposition" "$name"
-	results+=("$r")
+	typeset -a subdirs=("$dir"/*/)
+
+	fileCount=$((${#files[@]} - ${#subdirs[@]}))
+	if [ $fileCount -gt 0 ]; then
+	    name="$(basename -- "$dir")"
+	    preposition='in'; [[ "$name" =~ ^[a-z]+$ ]] && preposition='to'
+	    printf -v r '%d %s %s' "$fileCount" "$preposition" "$name"
+	    results+=("$r")
+	fi
     fi
 done
 exec joinBy ', ' "${results[@]}"
