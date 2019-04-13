@@ -1,16 +1,48 @@
 #!/bin/bash
 shopt -qs nullglob
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-t|--today|-b|--both] DIR [...] [-?|-h|--help]'
+}
 printUsage()
 {
-    cat <<HELPTEXT
-Print the number of files in each passed DIR (if it's not empty).
-HELPTEXT
-    printf 'Usage: %q %s\n' "$(basename "$1")" 'DIR [...] [-?|-h|--help]'
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
 }
-case "$1" in
-    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-esac
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Print the number of files (without subdirs) in each passed DIR (if it's not
+empty).
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --today|-t		Only count files modified today.
+    --both|-b		Show counts for all files and those modified today
+			separately.
+HELPTEXT
+}
+
+tally='any'
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--today|-t)	shift; tally='today';;
+	--both|-b)	shift; tally='any,today';;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
 if [ $# -eq 0 ]; then
     printUsage "$0" >&2
     exit 2
@@ -22,13 +54,41 @@ do
     files=("$dir"/*)
 
     if [ ${#files[@]} -gt 0 ]; then
-	typeset -a subdirs=("$dir"/*/)
+	let count=0
+	case ",${tally}," in
+	    *,any,*)
+		typeset -a subdirs=("$dir"/*/)
+		fileCount=$((${#files[@]} - ${#subdirs[@]}))
+		let count+=$fileCount
+		;;&
+	    *,today,*)
+		todayCount="$(find "$dir" -maxdepth 1 -type f -newermt '03:00' -printf '.' | wc -c)"
+		let count+=$todayCount
+		;;&
+	esac
 
-	fileCount=$((${#files[@]} - ${#subdirs[@]}))
-	if [ $fileCount -gt 0 ]; then
+	if [ $count -gt 0 ]; then
 	    name="$(basename -- "$dir")"
 	    preposition='in'; [[ "$name" =~ ^[a-z]+$ ]] && preposition='to'
-	    printf -v r '%d %s %s' "$fileCount" "$preposition" "$name"
+
+	    case ",${tally}," in
+		*,any,today,*|*,today,any,*)
+		    if [ $fileCount -eq $todayCount ]; then
+			printf -v r '%d (all today) %s %s' "$fileCount" "$preposition" "$name"
+		    elif [ $todayCount -ge 1 ]; then
+			printf -v r '%d (%d today) %s %s' "$fileCount" "$todayCount" "$preposition" "$name"
+		    else
+			printf -v r '%d (all old) %s %s' "$fileCount" "$preposition" "$name"
+		    fi
+		    ;;
+		*,any,*)
+		    printf -v r '%d %s %s' "$fileCount" "$preposition" "$name"
+		    ;;
+		*,today,*)
+		    printf -v r 'today %d %s %s' "$todayCount" "$preposition" "$name"
+		    ;;
+	    esac
+
 	    results+=("$r")
 	fi
     fi
