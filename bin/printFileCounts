@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-t|--today|-b|--both] DIR [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-n|--since [DESCRIPTION\t]DATE ... [-a|--all]] DIR [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -25,19 +25,23 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     cat <<HELPTEXT
-    --today|-t		Only count files modified today.
-    --both|-b		Show counts for all files and those modified today
-			separately.
+    --since|-n [DESCRIPTION\t]DATE
+			Count files newer than DATE (with the DATE optionally
+			mentioned as DESCRIPTION). If given multiple times, will
+			tally all DATE ranges separately.
+    --all|-a		Also add the complete number of files when --since is
+			used.
 HELPTEXT
 }
 
-tally='any'
+isAll=
+typeset -a dates=()
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
-	--today|-t)	shift; tally='today';;
-	--both|-b)	shift; tally='any,today';;
+	--since|-n)	shift; dates+=("$1"); shift;;
+	--all|-a)	shift; isAll=t;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -47,6 +51,7 @@ if [ $# -eq 0 ]; then
     printUsage "$0" >&2
     exit 2
 fi
+[ ${#dates[@]} -eq 0 ] && isAll=t
 
 typeset -a results=()
 for dir
@@ -55,40 +60,33 @@ do
 
     if [ ${#files[@]} -gt 0 ]; then
 	let count=0
-	case ",${tally}," in
-	    *,any,*)
-		typeset -a subdirs=("$dir"/*/)
-		fileCount=$((${#files[@]} - ${#subdirs[@]}))
-		let count+=$fileCount
-		;;&
-	    *,today,*)
-		todayCount="$(find "$dir" -maxdepth 1 -type f -newermt '03:00' -printf '.' | wc -c)"
-		let count+=$todayCount
-		;;&
-	esac
+	let fileCount=0
+	typeset dateCounts=()
+	if [ "$isAll" ]; then
+	    typeset -a subdirs=("$dir"/*/)
+	    fileCount=$((${#files[@]} - ${#subdirs[@]}))
+	    let count+=$fileCount
+	fi
+	for dateSpec in "${dates[@]}"
+	do
+	    c="$(find "$dir" -maxdepth 1 -type f -newermt "${dateSpec#*$'\t'}" -printf '.' | wc -c)"
+	    if [ $c -gt 0 ]; then
+		dateCounts+=("${dateSpec%%$'\t'*} $c")
+	    fi
+	    let count+=$c
+	done
 
 	if [ $count -gt 0 ]; then
 	    name="$(basename -- "$dir")"
 	    preposition='in'; [[ "$name" =~ ^[a-z]+$ ]] && preposition='to'
 
-	    case ",${tally}," in
-		*,any,today,*|*,today,any,*)
-		    if [ $fileCount -eq $todayCount ]; then
-			printf -v r '%d (all today) %s %s' "$fileCount" "$preposition" "$name"
-		    elif [ $todayCount -ge 1 ]; then
-			printf -v r '%d (%d today) %s %s' "$fileCount" "$todayCount" "$preposition" "$name"
-		    else
-			printf -v r '%d (all old) %s %s' "$fileCount" "$preposition" "$name"
-		    fi
-		    ;;
-		*,any,*)
-		    printf -v r '%d %s %s' "$fileCount" "$preposition" "$name"
-		    ;;
-		*,today,*)
-		    printf -v r 'today %d %s %s' "$todayCount" "$preposition" "$name"
-		    ;;
-	    esac
-
+	    if [ ${#dateCounts[@]} -eq 0 ]; then
+		printf -v r '%d %s %s' "$fileCount" "$preposition" "$name"
+	    elif [ -n "$isAll" -a $count -gt $fileCount ]; then
+		printf -v r '%d (%s) %s %s' "$fileCount" "$(joinBy ', ' "${dateCounts[@]}")" "$preposition" "$name"
+	    else
+		printf -v r '%s %s %s' "$(joinBy ', ' "${dateCounts[@]}")" "$preposition" "$name"
+	    fi
 	    results+=("$r")
 	fi
     fi
