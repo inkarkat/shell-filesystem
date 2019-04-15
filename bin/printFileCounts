@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-n|--since [DESCRIPTION\t]DATE ... [-a|--all]] DIR [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-n|--since [DESCRIPTION\t]DATE ... [-a|--all]] [--dir-as-verb DIR ...] DIR [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -31,17 +31,21 @@ HELPDESCRIPTION
 			tally all DATE ranges separately.
     --all|-a		Also add the complete number of files when --since is
 			used.
+    --dir-as-verb DIR	Interpret DIR as a verb; i.e. instead of saying "in
+			DIR", use "to DIR".
 HELPTEXT
 }
 
 isAll=
 typeset -a dates=()
+typeset -a dirsAsVerbs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--since|-n)	shift; dates+=("$1"); shift;;
 	--all|-a)	shift; isAll=t;;
+	--dir-as-verb)	shift; dirsAsVerbs+=("$1"); shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -78,7 +82,7 @@ do
 
 	if [ $count -gt 0 ]; then
 	    name="$(basename -- "$dir")"
-	    preposition='in'; [[ "$name" =~ ^[a-z]+$ ]] && preposition='to'
+	    preposition='in'; contains "$name" "${dirsAsVerbs[@]}" && preposition='to'
 
 	    if [ ${#dateCounts[@]} -eq 0 ]; then
 		printf -v r '%d %s %s' "$fileCount" "$preposition" "$name"
