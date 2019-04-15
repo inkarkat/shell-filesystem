@@ -1,6 +1,9 @@
 #!/bin/bash
 shopt -qs nullglob
 
+: ${PRINTFILECOUNTS_PREFIX=}
+: ${PRINTFILECOUNTS_SUFFIX=}
+
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
@@ -95,4 +98,6 @@ do
 	fi
     fi
 done
-exec joinBy ', ' "${results[@]}"
+
+[ ${#results[@]} -eq 0 ] && exit 0
+exec joinBy --prefix "$PRINTFILECOUNTS_PREFIX" --suffix "$PRINTFILECOUNTS_SUFFIX" ', ' "${results[@]}"
