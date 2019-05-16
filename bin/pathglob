@@ -4,15 +4,20 @@ printUsage()
 {
     cat <<HELPTEXT
 Find executable files accessible through PATH that match the supplied GLOB.
+With -l|--long, prints the full path; by default, only the command itself is
+printed (as it is accessible through PATH).
 HELPTEXT
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-l|--long] GLOB [find-expression] [-?|-h|--help]'
 }
+
+typeset -a shortenPipeline=(xargs -n 1 basename)
 case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+    --long|-l)		shift; shortenPipeline=();;
 esac
 if [ $# -eq 0 ]; then
     echo >&2 "ERROR: Missing GLOB argument!"
     exit 2
 fi
 
-exec pathfind -maxdepth 1 -executable -name "$@"
+eval 'exec pathfind -maxdepth 1 -executable -name "$@"' "${shortenPipeline:+|}" '"${shortenPipeline[@]}"'
