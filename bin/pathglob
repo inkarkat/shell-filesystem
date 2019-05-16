@@ -3,21 +3,42 @@
 printUsage()
 {
     cat <<HELPTEXT
-Find executable files accessible through PATH that match the supplied GLOB.
-With -l|--long, prints the full path; by default, only the command itself is
-printed (as it is accessible through PATH).
+Find files accessible through PATH (the environment variable or the PATH-like
+colon-separated contents passed as the first argument) that match the supplied
+GLOB. In case of the PATH environment variable, the files must also be
+executable.
+    --long|-l	Print the full path (this is the default if a custom PATH is
+		passed as the first argument).
+    --basename|-b
+		Print only the command itself (this is the default if the
+		environment variable  PATH is used, as a command is accessible
+		through PATH).
 HELPTEXT
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-l|--long] GLOB [find-expression] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-l|--long|-b|--basename] [-e|--expression PATH] [--] GLOB [find-expression] [-?|-h|--help]'
 }
 
-typeset -a shortenPipeline=(xargs -n 1 basename)
-case "$1" in
-    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-    --long|-l)		shift; shortenPipeline=();;
-esac
+typeset -a path=()
+typeset -a findArgs=(-executable)
+output=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	    shift; printUsage "$0"; exit 0;;
+	--long|-l)	    shift; output='full';;
+	--basename|-b)	    shift; output='basename';;
+	--expression|-e)    shift; path=("$1"); findArgs=(); shift;;
+	--)		    shift; break;;
+	-*)		    { echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		    break;;
+    esac
+done
 if [ $# -eq 0 ]; then
     echo >&2 "ERROR: Missing GLOB argument!"
     exit 2
 fi
+typeset -a shortenPipeline=()
+if [ "$output" = 'basename' ] || [ -z "$output" -a ${#path[@]} -eq 0 ]; then
+    typeset -a shortenPipeline=(xargs -n 1 basename)
+fi
 
-eval 'exec pathfind -maxdepth 1 -executable -name "$@"' "${shortenPipeline:+|}" '"${shortenPipeline[@]}"'
+eval 'exec pathfind "${path[@]}" -maxdepth 1 "${findArgs[@]}" -name "$@"' "${shortenPipeline:+|}" '"${shortenPipeline[@]}"'
