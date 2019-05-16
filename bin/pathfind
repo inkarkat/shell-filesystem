@@ -14,5 +14,5 @@ case "$1" in
 esac
 
 IFS=:
-set -f
+set -o noglob
 exec find $PATH "$@"
