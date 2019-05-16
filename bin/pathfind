@@ -4,15 +4,25 @@
 printUsage()
 {
     cat <<HELPTEXT
-Search for files accessible through any directory found in PATH.
+Search for files accessible through any directory found in PATH (the environment
+variable or the PATH-like colon-separated contents passed as the first
+argument).
 Like find, also searches subdirectories by default, unless -maxdepth 1 is given.
 HELPTEXT
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[find-expression] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--] [find-expression] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--expression] PATH [find-expression] [-?|-h|--help]'
 }
 case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
 esac
 
+case "$1" in
+    --expression|-e)	shift; path="$1"; shift;;
+    --)	shift;&
+    -*)	path="$PATH";;
+    *)	path="$1"; shift;;
+esac
+
 IFS=:
 set -o noglob
-exec find $PATH "$@"
+exec find $path "$@"
