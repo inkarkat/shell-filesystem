@@ -1,3 +1,23 @@
-#!/bin/sh
+#!/bin/bash
 
-exec stat -L --format %Y "$@"
+printUsage()
+{
+    cat <<HELPTEXT
+Show the age (in seconds since the Epoch, or seconds with -d|--diff) of all passed FILE(s).
+HELPTEXT
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-d|--diff] FILE [...] [-?|-h|--help]'
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+    --diff|-d)
+	shift
+	now="$(date +%s)"
+	while read -r epoch
+	do
+	    printf '%d\n' "$((now - epoch))"
+	done < <(stat -L --format %Y "$@")
+	;;
+    *)
+	exec stat -L --format %Y "$@"
+	;;
+esac
