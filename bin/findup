@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-printf 'Usage: %q %s\n' "$(basename "$1")" "[--mindepth LEVELS] [--maxdepth LEVELS] [--] FILE|'GLOB' [...] [-?|-h|--help]"
+printf 'Usage: %q %s\n' "$(basename "$1")" "[-1|--stop-at-first] [--mindepth LEVELS] [--maxdepth LEVELS] [--] FILE|'GLOB' [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -25,6 +25,8 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     cat <<HELPTEXT
+    --stop-at-first|-1	Stop ascending further once match(es) have been found in
+			any upper directory.
     --maxdepth LEVELS	Ascend at most LEVELS of directories above the current
 			directory.
     --mindepth LEVELS	Do not test at levels less than LEVELS. --mindepth 1
@@ -32,12 +34,15 @@ HELPDESCRIPTION
 			directory.
 HELPTEXT
 }
+isStopAtFirst=
 maxdepth=
 mindepth=
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--stop-at-first|-1)
+			shift; isStopAtFirst=t;;
 	--maxdepth)	shift; maxdepth="$1"; shift;;
 	--mindepth)	shift; mindepth="$1"; shift;;
 	--)		shift; break;;
@@ -46,7 +51,7 @@ do
     esac
 done
 if [ $# -eq 0 ]; then
-    printUsage "$0"
+    printUsage >&2 "$0"
     exit 2
 fi
 
@@ -79,6 +84,7 @@ let level=0
 while [ "$oldWd" != "$PWD" ]
 do
     if printGlobMatches "$@" 2>/dev/null; then
+	[ "$isStopAtFirst" ] && exit 0
 	status=0
     fi
     oldWd="$PWD"
