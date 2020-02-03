@@ -16,14 +16,16 @@ if [ $# -eq 0 ]; then
     exit 2
 fi
 
+status=1
 oldWd=
 while [ "$oldWd" != "$PWD" ]
 do
     if ls "$@" >/dev/null 2>&1; then
+	status=0
 	ls "$@" | sed -e "s+^+${PWD%/}/+"
     fi
     oldWd=$PWD
     cd .. || exit 3
 done
 
-exit 1
+exit $status
