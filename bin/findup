@@ -19,8 +19,8 @@ fi
 oldWd=
 while [ "$oldWd" != "$PWD" ]
 do
-    if eval ls "$@" >/dev/null 2>&1; then
-	eval ls "$@" | sed -e "s+^+${PWD%/}/+"
+    if ls "$@" >/dev/null 2>&1; then
+	ls "$@" | sed -e "s+^+${PWD%/}/+"
     fi
     oldWd=$PWD
     cd .. || exit 3
