@@ -1,22 +1,62 @@
 #!/bin/bash
 shopt -qs extglob nullglob dotglob
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+printf 'Usage: %q %s\n' "$(basename "$1")" "[--mindepth LEVELS] [--maxdepth LEVELS] [--] FILE|'GLOB' [...] [-?|-h|--help]"
+}
 printUsage()
 {
-    cat <<HELPTEXT
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
 Locate a FILE or matches for 'GLOB' in parent directories (up to the root
 directory), and print its / their full path(s).
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --maxdepth LEVELS	Ascend at most LEVELS of directories above the current
+			directory.
+    --mindepth LEVELS	Do not test at levels less than LEVELS. --mindepth 1
+			means report any files except inside the current
+			directory.
 HELPTEXT
-printf 'Usage: %q %s\n' "$(basename "$1")" "FILE|'GLOB' [...] [-?|-h|--help]"
 }
-case "$1" in
-    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-esac
+maxdepth=
+mindepth=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--maxdepth)	shift; maxdepth="$1"; shift;;
+	--mindepth)	shift; mindepth="$1"; shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
 if [ $# -eq 0 ]; then
     printUsage "$0"
     exit 2
 fi
 
+printMatches()
+{
+    [ "$mindepth" ] && [ $level -lt $mindepth ] && return 1
+    [ "$maxdepth" ] && [ $level -gt $maxdepth ] && return 1
+
+    printf "$@"
+}
 printGlobMatches()
 {
     typeset -a files=($@)
@@ -28,14 +68,14 @@ printGlobMatches()
     for f in "${files[@]}"
     do
 	[ -e "$f" ] || continue
-	status=0
-	printf '%s/%s\n' "${PWD%/}" "$f"
+	printMatches '%s/%s\n' "${PWD%/}" "$f" && status=0
     done
     return $status
 }
 
 status=1
 oldWd=
+let level=0
 while [ "$oldWd" != "$PWD" ]
 do
     if printGlobMatches "$@" 2>/dev/null; then
@@ -43,6 +83,7 @@ do
     fi
     oldWd="$PWD"
     cd .. || exit 3
+    let level+=1
 done
 
 exit $status
