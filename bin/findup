@@ -1,4 +1,5 @@
 #!/bin/bash
+shopt -qs extglob nullglob dotglob
 
 printUsage()
 {
@@ -6,7 +7,7 @@ printUsage()
 Locate a FILE or matches for 'GLOB' in parent directories (up to the root
 directory), and print its / their full path(s).
 HELPTEXT
-printf 'Usage: %q %s\n' "$(basename "$1")" "FILE|'GLOB' [, ...] [-?|-h|--help]"
+printf 'Usage: %q %s\n' "$(basename "$1")" "FILE|'GLOB' [...] [-?|-h|--help]"
 }
 case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
@@ -16,15 +17,31 @@ if [ $# -eq 0 ]; then
     exit 2
 fi
 
+printGlobMatches()
+{
+    typeset -a files=($@)
+    # If globbing didn't yield anything, we've failed.
+    ((${#files[@]})) || return 1
+    # Still need to check for existing files; in case a GLOB without a wildcard was
+    # passed, it's not eliminated by nullglob.
+    local status=1
+    for f in "${files[@]}"
+    do
+	[ -e "$f" ] || continue
+	status=0
+	printf '%s/%s\n' "${PWD%/}" "$f"
+    done
+    return $status
+}
+
 status=1
 oldWd=
 while [ "$oldWd" != "$PWD" ]
 do
-    if ls "$@" >/dev/null 2>&1; then
+    if printGlobMatches "$@" 2>/dev/null; then
 	status=0
-	ls "$@" | sed -e "s+^+${PWD%/}/+"
     fi
-    oldWd=$PWD
+    oldWd="$PWD"
     cd .. || exit 3
 done
 
