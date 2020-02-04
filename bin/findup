@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-printf 'Usage: %q %s\n' "$(basename "$1")" "[-1|--stop-at-first] [--mindepth LEVELS] [--maxdepth LEVELS] [--] FILE|'GLOB' [...] [-?|-h|--help]"
+printf 'Usage: %q %s\n' "$(basename "$1")" "[STARTING-POINT [...]] [-1|--stop-at-first] [--mindepth LEVELS] [--maxdepth LEVELS] [--] FILE|'GLOB' [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -19,14 +19,16 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Locate a FILE or matches for 'GLOB' in parent directories (up to the root
-directory), and print its / their full path(s).
+Locate a FILE or matches for 'GLOB' in parent directories (from the current
+directory or passed STARTING-POINT(s), up to the root directory), and print its
+/ their full path(s).
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
     cat <<HELPTEXT
-    --stop-at-first|-1	Stop ascending further once match(es) have been found in
-			any upper directory.
+    --stop-at-first|-1	Stop ascending further (and considering more
+			STARTING-POINT(s)) once match(es) have been found in any
+			upper directory.
     --maxdepth LEVELS	Ascend at most LEVELS of directories above the current
 			directory.
     --mindepth LEVELS	Do not test at levels less than LEVELS. --mindepth 1
@@ -34,6 +36,17 @@ HELPDESCRIPTION
 			directory.
 HELPTEXT
 }
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+esac
+typeset -a startingPoints=()
+# As we change directories, need to first convert all passed starting points to
+# absolute dirspecs.
+while [ $# -ne 0 -a -d "$1" ]
+do
+    startingPoints+=("$(realpath --no-symlinks -- "$1")"); shift
+done
+
 isStopAtFirst=
 maxdepth=
 mindepth=
@@ -79,17 +92,21 @@ printGlobMatches()
 }
 
 status=1
-oldWd=
-let level=0
-while [ "$oldWd" != "$PWD" ]
+for baseDir in "${startingPoints[@]:-}"
 do
-    if printGlobMatches "$@" 2>/dev/null; then
-	[ "$isStopAtFirst" ] && exit 0
-	status=0
-    fi
-    oldWd="$PWD"
-    cd .. || exit 3
-    let level+=1
-done
+    [ "$baseDir" ] && cd "$baseDir"
 
+    oldWd=
+    let level=0
+    while [ "$oldWd" != "$PWD" ]
+    do
+	if printGlobMatches "$@" 2>/dev/null; then
+	    [ "$isStopAtFirst" ] && exit 0
+	    status=0
+	fi
+	oldWd="$PWD"
+	cd .. || exit 3
+	let level+=1
+    done
+done
 exit $status
