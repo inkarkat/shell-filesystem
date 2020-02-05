@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-printf 'Usage: %q %s\n' "$(basename "$1")" "[STARTING-POINT [...]] [-1|--stop-at-first|--stop-at DIR [...] --stopdepth LEVELS] [--mindepth LEVELS] [--maxdepth LEVELS] [--] FILE|'GLOB' [...] [-?|-h|--help]"
+printf 'Usage: %q %s\n' "$(basename "$1")" "[STARTING-POINT [...]] [-1|--stop-at-first|--stop-at DIR [...] --stopdepth LEVELS] [--mindepth LEVELS] [--maxdepth LEVELS] [--print|--execdir COMMAND [...] ;] [--] FILE|'GLOB' [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -37,6 +37,8 @@ HELPDESCRIPTION
     --mindepth LEVELS	Do not test at levels less than LEVELS. --mindepth 1
 			means report any files except inside the current
 			directory.
+    --execdir COMMAND ;	Execute COMMAND from the directory containing the found
+			file. {} is replaced with its filespec.
 HELPTEXT
 }
 case "$1" in
@@ -55,6 +57,8 @@ typeset -a stopAt=()
 stopdepth=
 maxdepth=
 mindepth=
+unset isPrint
+typeset -a execCommand=()
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -65,6 +69,21 @@ do
 	--stopdepth)	shift; stopdepth="$1"; shift;;
 	--maxdepth)	shift; maxdepth="$1"; shift;;
 	--mindepth)	shift; mindepth="$1"; shift;;
+	--print)	shift; isPrint=t;;
+	--execdir)	shift; : ${isPrint=}
+			while [ "$1" != ';' ]
+			do
+			    if [ $# -eq 0 ]; then
+				echo >&2 'ERROR: --exec must be concluded by ;'
+				echo >&2
+				printShortUsage "$0" >&2
+				exit 2
+			    fi
+
+			    execCommand+=("$1"); shift
+			done
+			shift
+			;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -75,14 +94,20 @@ if [ $# -eq 0 ]; then
     exit 2
 fi
 
-printMatches()
+processMatches()
 {
     [ "$mindepth" ] && [ $level -lt $mindepth ] && return 1
     [ "$maxdepth" ] && [ $level -gt $maxdepth ] && return 1
 
-    printf "$@"
+    [ "${isPrint-t}" ] && printf "${1}\\n" "${@:2}"
+
+    if [ ${#execCommand[@]} -gt 0 ]; then
+	local filespec; printf -v filespec "$@"
+	typeset -a interpolatedCommand=("${execCommand[@]//\{\}/$filespec}")
+	"${interpolatedCommand[@]}"
+    fi
 }
-printGlobMatches()
+processGlobMatches()
 {
     typeset -a files=($@)
     # If globbing didn't yield anything, we've failed.
@@ -93,7 +118,7 @@ printGlobMatches()
     for f in "${files[@]}"
     do
 	[ -e "$f" ] || continue
-	printMatches '%s/%s\n' "${PWD%/}" "$f" && status=0
+	processMatches '%s/%s' "${PWD%/}" "$f" && status=0
     done
     return $status
 }
@@ -107,7 +132,7 @@ do
     let level=0
     while [ "$oldWd" != "$PWD" ]
     do
-	if printGlobMatches "$@" 2>/dev/null; then
+	if processGlobMatches "$@" 2>/dev/null; then
 	    [ "$isStopAtFirst" ] && exit 0
 	    status=0
 	fi
