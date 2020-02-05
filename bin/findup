@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-printf 'Usage: %q %s\n' "$(basename "$1")" "[STARTING-POINT [...]] [-1|--stop-at-first] [--mindepth LEVELS] [--maxdepth LEVELS] [--] FILE|'GLOB' [...] [-?|-h|--help]"
+printf 'Usage: %q %s\n' "$(basename "$1")" "[STARTING-POINT [...]] [-1|--stop-at-first|--stop-at DIR [...] --stopdepth LEVELS] [--mindepth LEVELS] [--maxdepth LEVELS] [--] FILE|'GLOB' [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -29,6 +29,9 @@ HELPDESCRIPTION
     --stop-at-first|-1	Stop ascending further (and considering more
 			STARTING-POINT(s)) once match(es) have been found in any
 			upper directory.
+    --stop-at DIR	Stop ascending further when arriving at DIR.
+    --stopdepth LEVELS	Stop ascending when arriving at LEVELS subdirectory from
+			the top (/ = 0).
     --maxdepth LEVELS	Ascend at most LEVELS of directories above the current
 			directory.
     --mindepth LEVELS	Do not test at levels less than LEVELS. --mindepth 1
@@ -48,6 +51,8 @@ do
 done
 
 isStopAtFirst=
+typeset -a stopAt=()
+stopdepth=
 maxdepth=
 mindepth=
 while [ $# -ne 0 ]
@@ -56,6 +61,8 @@ do
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--stop-at-first|-1)
 			shift; isStopAtFirst=t;;
+	--stop-at)	shift; stopAt+=("${1%/}"); shift;;
+	--stopdepth)	shift; stopdepth="$1"; shift;;
 	--maxdepth)	shift; maxdepth="$1"; shift;;
 	--mindepth)	shift; mindepth="$1"; shift;;
 	--)		shift; break;;
@@ -104,6 +111,14 @@ do
 	    [ "$isStopAtFirst" ] && exit 0
 	    status=0
 	fi
+
+	[ ${#stopAt[@]} -gt 0 ] && contains "${PWD%/}" "${stopAt[@]}" && break
+	if [ "$stopdepth" ]; then
+	    currentPathSeparators="${PWD%/}"
+	    currentPathSeparators="${currentPathSeparators//[^\/]/}"
+	    [ ${#currentPathSeparators} -le $stopdepth ] && break
+	fi
+
 	oldWd="$PWD"
 	cd .. || exit 3
 	let level+=1
