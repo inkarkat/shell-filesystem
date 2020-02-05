@@ -104,7 +104,7 @@ processMatches()
     if [ ${#execCommand[@]} -gt 0 ]; then
 	local filespec; printf -v filespec "$@"
 	typeset -a interpolatedCommand=("${execCommand[@]//\{\}/$filespec}")
-	"${interpolatedCommand[@]}"
+	("${interpolatedCommand[@]}") || exit $?
     fi
 }
 processGlobMatches()
