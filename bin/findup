@@ -1,6 +1,12 @@
 #!/bin/bash
 shopt -qs extglob nullglob dotglob
 
+case ",${DEBUG:-}," in
+    *,findup\!,*)	printf >&2 %s "$PS4"; printf >&2 '%q ' 'findup' "$@"; printf >&2 '\n'; exit;;
+    *,findup,*)	printf >&2 %s "$PS4"; printf >&2 '%q ' 'findup' "$@"; printf >&2 '\n';;&
+    *,findup=*,*)	findupCommand=",${DEBUG},"; findupCommand="${findupCommand#*,findup=}"; findupCommand="${findupCommand%%,*}"; exec $findupCommand "$@";;
+esac
+
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
