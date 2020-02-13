@@ -3,10 +3,10 @@
 printUsage()
 {
     cat <<HELPTEXT
-Test whether the current working directory or passed dir-/filespec is inside a
-directory tree.
+Test whether the current working directory or passed FILE lies inside the
+directory tree at DIRSPEC.
 HELPTEXT
-    printf 'Usage: %q %s\n' "$(basename "$1")" 'dirspec [file] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" 'DIRSPEC [FILE] [-?|-h|--help]'
 }
 case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
@@ -16,21 +16,21 @@ if [ $# -eq 0 -o $# -gt 2 ]; then
     exit 2
 fi
 
-readonly dirspec=$1
+readonly dirspec="$1"
 shift
 if [ $# -gt 0 ]; then
-    readonly file=$1
+    readonly file="$1"
 else
-    readonly file=$PWD
+    readonly file="$PWD"
 fi
 
 # https://github.com/dominictarr/JSON.sh/pull/2#issuecomment-2526006
 readlinkEmulation()
 {
-    cd "$(dirname $1)"
-    local filename=$(basename $1)
+    cd "$(dirname "$1")" || exit $?
+    local filename=$(basename "$1")
     if [ -h "$filename" ]; then
-	readlinkEmulation "$(readlink $filename)"
+	readlinkEmulation "$(readlink "$filename")"
     else
 	printf %s "$(pwd -P)/${filename}"
     fi
@@ -40,8 +40,8 @@ readlinkWrapper()
     readlink -nf "$@" 2>/dev/null || readlinkEmulation "$@"
 }
 
-readonly canonicalDirspec=$(readlinkWrapper "$dirspec")
-readonly canonicalFile=$(readlinkWrapper "$file")
+readonly canonicalDirspec="$(readlinkWrapper "$dirspec")"
+readonly canonicalFile="$(readlinkWrapper "$file")"
 
 case "${canonicalFile}/" in
     "${canonicalDirspec}"/*) exit 0;;
