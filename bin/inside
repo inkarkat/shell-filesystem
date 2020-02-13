@@ -1,34 +1,14 @@
 #!/bin/bash
 
-printUsage()
-{
-    cat <<HELPTEXT
-Test whether the current working directory or passed FILE lies inside the
-directory tree at DIRSPEC.
-HELPTEXT
-    printf 'Usage: %q %s\n' "$(basename "$1")" 'DIRSPEC [FILE] [-?|-h|--help]'
-}
-case "$1" in
-    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-esac
-if [ $# -eq 0 -o $# -gt 2 ]; then
-    printUsage "$0" >&2
-    exit 2
-fi
-
-readonly dirspec="$1"
-shift
-if [ $# -gt 0 ]; then
-    readonly file="$1"
-else
-    readonly file="$PWD"
-fi
-
 # https://github.com/dominictarr/JSON.sh/pull/2#issuecomment-2526006
 readlinkEmulation()
 {
-    cd "$(dirname "$1")" || exit $?
-    local filename=$(basename "$1")
+    if ! cd "$(dirname "$1")" 2>/dev/null; then
+	printf %s "$1"
+	return
+    fi
+
+    local filename="$(basename "$1")"
     if [ -h "$filename" ]; then
 	readlinkEmulation "$(readlink "$filename")"
     else
@@ -40,10 +20,52 @@ readlinkWrapper()
     readlink -nf "$@" 2>/dev/null || readlinkEmulation "$@"
 }
 
-readonly canonicalDirspec="$(readlinkWrapper "$dirspec")"
-readonly canonicalFile="$(readlinkWrapper "$file")"
-
-case "${canonicalFile}/" in
-    "${canonicalDirspec}"/*) exit 0;;
-    *)			     exit 1;;
+printUsage()
+{
+    cat <<HELPTEXT
+Test whether the current working directory or (all) passed FILE(s) lie inside
+(any of) the directory tree(s) at DIRSPEC.
+HELPTEXT
+    printf 'Usage: %q %s\n' "$(basename "$1")" 'DIRSPEC [FILE [...]] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '-d|--dir DIRSPEC [...] [--] [FILE [...]] [-?|-h|--help]'
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
 esac
+typeset -a dirspecs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--dir|-d)	shift; dirspecs+=("$(readlinkWrapper "$1")"); shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ ${#dirspecs[@]} -eq 0 ]; then
+    dirspecs+=("$(readlinkWrapper "$1")"); shift
+fi
+typeset -a filespecs=()
+for file in "${@:-"$PWD"}"
+do
+    filespecs+=("$(readlinkWrapper "$file")")
+done
+
+isFileInsideAnyDir()
+{
+    local file="${1:?}"; shift
+    for dir in "${dirspecs[@]}"
+    do
+	case "${file}/" in
+	    "${dir}"/*) return 0;;
+	    *)		;;
+	esac
+    done
+    return 1
+}
+
+for file in "${filespecs[@]}"
+do
+    isFileInsideAnyDir "$file" || exit 1
+done
