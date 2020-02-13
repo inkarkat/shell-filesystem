@@ -3,7 +3,8 @@ shopt -qs extglob nullglob dotglob
 
 case ",${DEBUG:-}," in
     *,findup\!,*)	printf >&2 %s "$PS4"; printf >&2 '%q ' 'findup' "$@"; printf >&2 '\n'; exit;;
-    *,findup,*)	printf >&2 %s "$PS4"; printf >&2 '%q ' 'findup' "$@"; printf >&2 '\n';;&
+    *,findup,*)		printf >&2 %s "$PS4"; printf >&2 '%q ' 'findup' "$@"; printf >&2 '\n';;&
+    *,findup\&,*)	printf >&2 %s "$PS4"; printf >&2 '%q ' 'findup' "$@"; printf >&2 '\n'; findupTrace='set -x';;&
     *,findup=*,*)	findupCommand=",${DEBUG},"; findupCommand="${findupCommand#*,findup=}"; findupCommand="${findupCommand%%,*}"; exec $findupCommand "$@";;
 esac
 
@@ -11,7 +12,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-printf 'Usage: %q %s\n' "$(basename "$1")" "[STARTING-POINT [...]] [-1|--stop-at-first|--stop-at DIR [...] --stopdepth LEVELS] [--mindepth LEVELS] [--maxdepth LEVELS] [--print|--exec COMMAND [...] ;|--execdir COMMAND [...] ;] [--] FILE|'GLOB' [...] [-?|-h|--help]"
+printf 'Usage: %q %s\n' "$(basename "$1")" "[STARTING-POINT [...]] [-1|--stop-at-first] [--stop-at DIR [...]] [--not-above DIR [...]] [--stopdepth LEVELS] [--mindepth LEVELS] [--maxdepth LEVELS] [--print|--exec COMMAND [...] ;|--execdir COMMAND [...] ;] [--] FILE|'GLOB' [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -36,6 +37,8 @@ HELPDESCRIPTION
 			STARTING-POINT(s)) once match(es) have been found in any
 			upper directory.
     --stop-at DIR	Stop ascending further when arriving at DIR.
+    --not-above DIR	Discard STARTING-POINTs that are already above / at DIR
+			and also stop ascending further when arriving at DIR.
     --stopdepth LEVELS	Stop ascending when arriving at LEVELS subdirectory from
 			the top (/ = 0).
     --maxdepth LEVELS	Ascend at most LEVELS of directories above the current
@@ -62,6 +65,7 @@ done
 
 isStopAtFirst=
 typeset -a stopAt=()
+typeset -a notAbove=()
 stopdepth=
 maxdepth=
 mindepth=
@@ -75,6 +79,7 @@ do
 	--stop-at-first|-1)
 			shift; isStopAtFirst=t;;
 	--stop-at)	shift; stopAt+=("${1%/}"); shift;;
+	--not-above)	shift; notAbove+=("${1%/}"); stopAt+=("${1%/}"); shift;;
 	--stopdepth)	shift; stopdepth="$1"; shift;;
 	--maxdepth)	shift; maxdepth="$1"; shift;;
 	--mindepth)	shift; mindepth="$1"; shift;;
@@ -138,11 +143,16 @@ processGlobMatches()
     done
     return $status
 }
-
+$findupTrace
 status=1
 for baseDir in "${startingPoints[@]:-}"
 do
     [ "$baseDir" ] && cd "$baseDir"
+
+    for notAboveDir in "${notAbove[@]}"
+    do
+	inside "${PWD%/}" "$notAboveDir" && continue 2
+    done
 
     oldWd=
     let level=0
