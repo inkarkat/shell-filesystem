@@ -52,6 +52,21 @@ HELPDESCRIPTION
 			file. {} is replaced with its filespec.
 HELPTEXT
 }
+
+fileGlobFollowedByOptionCheck()
+{
+    if [ ${#fileGlobs[@]} -gt 0 ]; then
+	fileGlobsPlural=s
+	fileGlobsVerb=are
+	if [ ${#fileGlobs[@]} -eq 1 ]; then
+	    fileGlobsPlural=
+	    fileGlobsVerb=is
+	fi
+	printf >&2 "ERROR: %s %s not a valid STARTING-POINT%s and to be treated as FILE|'GLOB' must be placed after %s.\\n" "${fileGlobs[*]}" "$fileGlobsVerb" "$fileGlobsPlural" "$1"
+	exit 2
+    fi
+}
+
 case "$1" in
     --help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 esac
@@ -72,6 +87,7 @@ do
     fi
 done
 
+typeset -a fileGlobs=()
 isStopAtFirst=
 typeset -a stopAt=()
 typeset -a notAbove=()
@@ -84,6 +100,7 @@ typeset -a execCommand=()
 while [ $# -ne 0 ]
 do
     case "$1" in
+	--*|-[h1?])	fileGlobFollowedByOptionCheck "$1";;&
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--stop-at-first|-1)
 			shift; isStopAtFirst=t;;
@@ -110,7 +127,7 @@ do
 			;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
-	*)		break;;
+	*)		fileGlobs+=("$1"); shift;;
     esac
 done
 if [ $# -eq 0 ]; then
