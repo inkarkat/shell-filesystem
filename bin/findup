@@ -28,7 +28,8 @@ printLongUsage()
     cat <<HELPDESCRIPTION
 Locate a FILE or matches for 'GLOB' in parent directories (from the current
 directory or passed STARTING-POINT(s), up to the root directory), and print its
-/ their full path(s).
+/ their full path(s). Each STARTING-POINT must be an existing directory or at
+least have an existing (grand-...)parent directory.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -151,6 +152,7 @@ do
 	*)		fileGlobs+=("$1"); shift;;
     esac
 done
+set -- "${fileGlobs[@]}" "$@"
 if [ $# -eq 0 ]; then
     printUsage >&2 "$0"
     exit 2
