@@ -58,9 +58,18 @@ esac
 typeset -a startingPoints=()
 # As we change directories, need to first convert all passed starting points to
 # absolute dirspecs.
-while [ $# -ne 0 -a -d "$1" ]
+while [ $# -ne 0 ]
 do
-    startingPoints+=("$(realpath --no-symlinks -- "$1")"); shift
+    if [ -d "$1" ]; then
+	startingPoints+=("$(realpath --no-symlinks -- "$1")"); shift
+    elif [ "${1:0:1}" != '-' -a "${1//\//}" != "$1" -a -e "$1" ]; then
+	printf >&2 'ERROR: STARTING-POINT is not a directory: %s\n' "$1"
+	echo >&2
+	printShortUsage "$0" >&2
+	exit 2
+    else
+	break
+    fi
 done
 
 isStopAtFirst=
