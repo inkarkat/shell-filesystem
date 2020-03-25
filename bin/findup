@@ -154,9 +154,9 @@ processGlobMatches()
 }
 $findupTrace
 status=1
-for baseDir in "${startingPoints[@]:-}"
+for baseDir in "${startingPoints[@]:-.}"
 do
-    [ "$baseDir" ] && cd "$baseDir"
+    [ "${baseDir:?}" = . ] || cd "$baseDir"
 
     for notAboveDir in "${notAbove[@]}"
     do
