@@ -66,6 +66,21 @@ fileGlobFollowedByOptionCheck()
 	exit 2
     fi
 }
+findExistingStartingPointAbove()
+{
+    local lowerStartingPoint
+    local startingPoint="$1"; shift
+    until [ "$lowerStartingPoint" = "$startingPoint" ]
+    do
+	lowerStartingPoint="$startingPoint"
+	startingPoint="$(dirname -- "$startingPoint")"
+	if [ -d "$startingPoint" ]; then
+	    printf %s "$startingPoint"
+	    return 0
+	fi
+    done
+    return 1
+}
 
 case "$1" in
     --help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
@@ -77,11 +92,17 @@ while [ $# -ne 0 ]
 do
     if [ -d "$1" ]; then
 	startingPoints+=("$(realpath --no-symlinks -- "$1")"); shift
-    elif [ "${1:0:1}" != '-' -a "${1//\//}" != "$1" -a -e "$1" ]; then
-	printf >&2 'ERROR: STARTING-POINT is not a directory: %s\n' "$1"
-	echo >&2
-	printShortUsage "$0" >&2
-	exit 2
+    elif [ "${1:0:1}" != '-' -a "${1//\//}" != "$1" ]; then
+	if [ -e "$1" ]; then
+	    printf >&2 'ERROR: STARTING-POINT is not a directory: %s\n' "$1"
+	    echo >&2
+	    printShortUsage "$0" >&2
+	    exit 2
+	elif startingPoint="$(findExistingStartingPointAbove "$(realpath --no-symlinks -- "$1" 2>/dev/null)")"; then
+	    startingPoints+=("$startingPoint"); shift
+	else
+	    break
+	fi
     else
 	break
     fi
