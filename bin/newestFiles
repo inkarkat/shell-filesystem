@@ -1,0 +1,117 @@
+#!/bin/bash
+shopt -qs nullglob
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-N|--newer FILE|'GLOB' [...]|-c|--count N] [--] [DIRSPEC [...]] [-?|-h|--help]"
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Print the filespecs of the last modified file(s) in the current directory / in
+each passed DIRSPEC.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --newer|-N FILE|'GLOB'  Print all files that have been modified after FILE
+			    / the newest file matching GLOB (if the directory
+			    has such a file). Output order is globally sorted by
+			    modification date, ascending.
+    --count|-c N	    Print the last N modified files (or fewer if not
+			    available) instead of just the last one. Output
+			    order is by modification date ascending, separately
+			    per each DIRSPEC.
+EXIT STATUS:
+    0	Complete success.
+    1	No files found.
+    2	Bad invocation, wrong or missing command-line arguments.
+    4	FILE does not exist / 'GLOB' did not yield any files.
+HELPTEXT
+}
+
+typeset -a globs=()
+unset count
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--newer|-N)	shift; globs+=("$1"); shift;;
+	--count|-c)	shift; count="$1"; shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+IFS=$'\n'
+fileAge()
+{
+    stat -L --format %Y "$@"
+}
+sentinelAge=
+if [ ${#globs[@]} -gt 0 ]; then
+    if [ -n "${count+t}" ]; then
+	echo 'ERROR: Cannot combine --newer with --count.'
+	echo
+	printShortUsage "$0"
+	exit 2
+    fi >&2
+
+    sentinelAge=-1
+    for globResult in ${globs[@]}
+    do
+	age=$(fileAge "$globResult")
+	[ $age -gt $sentinelAge ] && sentinelAge=$age
+    done
+    if [ $sentinelAge -eq -1 ]; then
+	printf >&2 'No sentinel files have been found for %s\n' "${globs[*]}"
+	exit 4
+    fi
+fi
+[ $# -gt 0 ] || set -- "$PWD"
+: ${count:=1}
+
+findNewer()
+{
+    local dirspec="${1:?}"; shift
+    local filespec
+    for filespec in "$dirspec"/*
+    do
+	age=$(fileAge "$filespec")
+	[ $age -gt $sentinelAge ] && printf '%d\t%s\n' "$age" "$filespec"
+    done
+}
+
+findLastModified()
+{
+    local dirspec="${1:?}"; shift
+    local lastFilespecs="$(LSCOLORS= ls -1 -t --reverse "$dirspec" | tail -n "$count")"
+    [ -n "$lastFilespecs" ] || return 1
+    printf '%s\n' "$lastFilespecs"
+}
+
+status=1
+if [ "$sentinelAge" ]; then
+    for dirspec
+    do
+	findNewer "$dirspec"
+    done | sort --field-separator $'\t' -k 1,1n -k 2f | cut -f 2- | outputOrError
+    status=$?
+else
+    for dirspec
+    do
+	findLastModified "$dirspec" && status=0
+    done
+fi
+exit $status
