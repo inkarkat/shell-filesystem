@@ -1,0 +1,105 @@
+#!/bin/bash
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-a|--after FILE|'GLOB' [...]|-c|--count N] [--] [DIRSPEC [...]] [-?|-h|--help]"
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Print the filespecs of the alphabetically last file(s) in the current directory
+/ in each passed DIRSPEC.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --after|-a FILE|'GLOB'  Print all files that alphabetically come after FILE
+			    (ignoring any path components) / the last file
+			    matching GLOB (if the directory has such a file).
+    --count|-c N	    Print the last N files (or fewer if not available)
+			    instead of just the last one.
+EXIT STATUS:
+    0	Complete success.
+    1	No files found.
+    2	Bad invocation, wrong or missing command-line arguments.
+HELPTEXT
+}
+
+typeset -a globs=()
+unset count
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--after|-a)	shift; globs+=("$1"); shift;;
+	--count|-c)	shift; count="$1"; shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+IFS=$'\n'
+if [ ${#globs[@]} -gt 0 ]; then
+    if [ -n "${count+t}" ]; then
+	echo 'ERROR: Cannot combine --after with --count.'
+	echo
+	printShortUsage "$0"
+	exit 2
+    fi >&2
+
+    typeset -A sentinels=()
+    for globResult in ${globs[@]}
+    do
+	sentinels["$(basename -- "$globResult")"]=1
+    done
+fi
+[ $# -gt 0 ] || set -- "$PWD"
+: ${count:=1}
+
+findAfter()
+{
+    local dirspec="${1:?}"; shift
+    typeset -a filespecs=("$dirspec"/*)
+    local i filename lastIndex=$((${#filespecs[@]} - 1))
+    for ((i = lastIndex; i >= 0; i--))
+    do
+	filename="$(basename -- "${filespecs[$i]}")" || continue
+	[ -n "$filename" ] && [ "${sentinels["$filename"]}" ] && break
+    done
+    [ $i -ge 0 -a $i -lt $lastIndex ] || return 1
+    printf '%s\n' "${filespecs[@]:$((i + 1))}"
+}
+
+findLast()
+{
+    local dirspec="${1:?}"; shift
+    typeset -a filespecs=("$dirspec"/*)
+    typeset -a lastFilespecs=("${filespecs[@]:$((${#filespecs[@]} - $count))}")
+    [ ${#lastFilespecs[@]} -gt 0 ] || return 1
+    printf '%s\n' "${lastFilespecs[@]}"
+}
+
+status=1
+if [ ${#sentinels[@]} -gt 0 ]; then
+    for dirspec
+    do
+	findAfter "$dirspec" && status=0
+    done
+else
+    for dirspec
+    do
+	findLast "$dirspec" && status=0
+    done
+fi
+exit $status
