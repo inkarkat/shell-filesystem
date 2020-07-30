@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-N|--newer FILE|'GLOB' [...]|-c|--count N] [--] [DIRSPEC [...]] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-t|--newer-than EPOCH|-N|--newer FILE|'GLOB' [...]|-c|--count N] [--] [DIRSPEC [...]] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -25,6 +25,9 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     cat <<HELPTEXT
+    --newer-than|-t EPOCH   Print all files that have been modified after EPOCH
+			    (seconds since 1970). Output order is globally
+			    sorted by modification date, ascending.
     --newer|-N FILE|'GLOB'  Print all files that have been modified after FILE
 			    / the newest file matching GLOB (if the directory
 			    has such a file). Output order is globally sorted by
@@ -41,12 +44,15 @@ EXIT STATUS:
 HELPTEXT
 }
 
+sentinelAge=
 typeset -a globs=()
 unset count
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--newer-than|-t)
+			shift; sentinelAge="${1:?}"; shift;;
 	--newer|-N)	shift; globs+=("$1"); shift;;
 	--count|-c)	shift; count="$1"; shift;;
 	--)		shift; break;;
@@ -59,9 +65,13 @@ fileAge()
 {
     stat -L --format %Y "$@"
 }
-sentinelAge=
 if [ ${#globs[@]} -gt 0 ]; then
-    if [ -n "${count+t}" ]; then
+    if [ -n "$sentinelAge" ]; then
+	echo 'ERROR: Cannot combine --newer-than with --newer.'
+	echo
+	printShortUsage "$0"
+	exit 2
+    elif [ -n "${count+t}" ]; then
 	echo 'ERROR: Cannot combine --newer with --count.'
 	echo
 	printShortUsage "$0"
@@ -78,6 +88,11 @@ if [ ${#globs[@]} -gt 0 ]; then
 	printf >&2 'No sentinel files have been found for %s\n' "${globs[*]}"
 	exit 4
     fi
+elif [ -n "${count+t}" -a -n "$sentinelAge" ]; then
+    echo 'ERROR: Cannot combine --newer-than with --count.'
+    echo
+    printShortUsage "$0"
+    exit 2
 fi
 [ $# -gt 0 ] || set -- "$PWD"
 : ${count:=1}
