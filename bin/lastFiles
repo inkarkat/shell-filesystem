@@ -85,7 +85,8 @@ findLast()
 {
     local dirspec="${1:?}"; shift
     typeset -a filespecs=("$dirspec"/*)
-    typeset -a lastFilespecs=("${filespecs[@]:$((${#filespecs[@]} - $count))}")
+    lastIndex=$((${#filespecs[@]} - $count)); [ $lastIndex -lt 0 ] && lastIndex=0
+    typeset -a lastFilespecs=("${filespecs[@]:$lastIndex}")
     [ ${#lastFilespecs[@]} -gt 0 ] || return 1
     printf '%s\n' "${lastFilespecs[@]}"
 }
