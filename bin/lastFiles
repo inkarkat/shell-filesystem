@@ -33,6 +33,7 @@ EXIT STATUS:
     0	Complete success.
     1	No files found.
     2	Bad invocation, wrong or missing command-line arguments.
+    4	No sentinel FILE|'GLOB' exists (so files cannot be searched).
 HELPTEXT
 }
 
@@ -61,8 +62,9 @@ if [ ${#globs[@]} -gt 0 ]; then
     typeset -A sentinels=()
     for globResult in ${globs[@]}
     do
-	sentinels["$(basename -- "$globResult")"]=1
+	[ -e "$globResult" ] && sentinels["$(basename -- "$globResult")"]=1
     done
+    [ ${#sentinels[@]} -eq 0 ] && exit 4
 fi
 [ $# -gt 0 ] || set -- "$PWD"
 : ${count:=1}
@@ -92,7 +94,7 @@ findLast()
 }
 
 status=1
-if [ ${#sentinels[@]} -gt 0 ]; then
+if [ ${#globs[@]} -gt 0 ]; then
     for dirspec
     do
 	findAfter "$dirspec" && status=0
