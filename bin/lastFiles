@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-a|--after FILE|'GLOB' [...]|-c|--count N] [--] [DIRSPEC [...]] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-a|--after FILE|'GLOB' [...] [-C|--count-if-sentinel-missing N] | -c|--count N] [--] [DIRSPEC [...]] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -27,23 +27,30 @@ HELPDESCRIPTION
     --after|-a FILE|'GLOB'  Print all files that alphabetically come after FILE
 			    (ignoring any path components) / the last file
 			    matching GLOB (if the directory has such a file).
+    --count-if-sentinel-missing|-C N
+			    Print the last N files (or fewer if not available)
+			    if no sentinel FILE|'GLOB' exists.
     --count|-c N	    Print the last N files (or fewer if not available)
 			    instead of just the last one.
 EXIT STATUS:
     0	Complete success.
     1	No files found.
     2	Bad invocation, wrong or missing command-line arguments.
-    4	No sentinel FILE|'GLOB' exists (so files cannot be searched).
+    4	No sentinel FILE|'GLOB' exists (so files cannot be searched) (and
+	--count-if-sentinel-missing has not been passed).
 HELPTEXT
 }
 
 typeset -a globs=()
+sentinelMissingCount=
 unset count
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--after|-a)	shift; globs+=("$1"); shift;;
+	--count-if-sentinel-missing|-C)
+			shift; sentinelMissingCount="$1"; shift;;
 	--count|-c)	shift; count="$1"; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
@@ -64,7 +71,14 @@ if [ ${#globs[@]} -gt 0 ]; then
     do
 	[ -e "$globResult" ] && sentinels["$(basename -- "$globResult")"]=1
     done
-    [ ${#sentinels[@]} -eq 0 ] && exit 4
+    if [ ${#sentinels[@]} -eq 0 ]; then
+	if [ -n "$sentinelMissingCount" ]; then
+	    count=$sentinelMissingCount
+	    globs=()
+	else
+	    exit 4
+	fi
+    fi
 fi
 [ $# -gt 0 ] || set -- "$PWD"
 : ${count:=1}
