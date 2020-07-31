@@ -117,14 +117,20 @@ findLastModified()
     done
 }
 
+typeset -a sortByDateThenFilespec=(sort --field-separator $'\t' -k 1,1n -k 2f)
 if [ "$sentinelAge" ]; then
-    for dirspec
-    do
-	findNewer "$dirspec"
-    done | sort --field-separator $'\t' -k 1,1n -k 2f | cut -f 2- | outputOrError
+    algorithm=findNewer
+    typeset -a limiter=()
 else
-    for dirspec
-    do
-	findLastModified "$dirspec" && status=0
-    done | sort --field-separator $'\t' -k 1,1n -k 2f | tail -n "$count" | cut -f 2- | outputOrError
+    algorithm=findLastModified
+    typeset -a limiter=(tail -n "$count")
 fi
+
+for dirspec
+do
+    $algorithm "$dirspec" && status=0
+done | \
+    eval '"${sortByDateThenFilespec[@]}"' \
+    "${limiter:+|}" '"${limiter[@]}"' | \
+    cut -f 2- | \
+    outputOrError
