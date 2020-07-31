@@ -20,22 +20,20 @@ printLongUsage()
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
 Print the filespecs of the last modified file(s) in the current directory / in
-each passed DIRSPEC.
+each passed DIRSPEC. Output order is globally sorted by modification date,
+ascending.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
     cat <<HELPTEXT
     --newer-than|-t EPOCH   Print all files that have been modified after EPOCH
-			    (seconds since 1970). Output order is globally
-			    sorted by modification date, ascending.
+			    (seconds since 1970).
     --newer|-N FILE|'GLOB'  Print all files that have been modified after FILE
 			    / the newest file matching GLOB (if the directory
 			    has such a file). Output order is globally sorted by
 			    modification date, ascending.
     --count|-c N	    Print the last N modified files (or fewer if not
-			    available) instead of just the last one. Output
-			    order is by modification date ascending, separately
-			    per each DIRSPEC.
+			    available) instead of just the last one.
 EXIT STATUS:
     0	Complete success.
     1	No files found.
@@ -111,22 +109,22 @@ findNewer()
 findLastModified()
 {
     local dirspec="${1:?}"; shift
-    local lastFilespecs="$(LSCOLORS= ls -1 -t --reverse "$dirspec" | tail -n "$count")"
-    [ -n "$lastFilespecs" ] || return 1
-    printf '%s\n' "$lastFilespecs"
+    local filespec
+    for filespec in "$dirspec"/*
+    do
+	age=$(fileAge "$filespec")
+	printf '%d\t%s\n' "$age" "$filespec"
+    done
 }
 
-status=1
 if [ "$sentinelAge" ]; then
     for dirspec
     do
 	findNewer "$dirspec"
     done | sort --field-separator $'\t' -k 1,1n -k 2f | cut -f 2- | outputOrError
-    status=$?
 else
     for dirspec
     do
 	findLastModified "$dirspec" && status=0
-    done
+    done | sort --field-separator $'\t' -k 1,1n -k 2f | tail -n "$count" | cut -f 2- | outputOrError
 fi
-exit $status
