@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-t|--newer-than EPOCH|-N|--newer FILE|'GLOB' [...]|-c|--count N] [--] [DIRSPEC [...]] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-t|--newer-than EPOCH|-N|--newer FILE|'GLOB' [...]|-c|--count N] [-e|--include-epoch] [--] [DIRSPEC [...]] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -34,6 +34,8 @@ HELPDESCRIPTION
 			    modification date, ascending.
     --count|-c N	    Print the last N modified files (or fewer if not
 			    available) instead of just the last one.
+    --include-epoch|-e	    Put the file modification date (seconds since 1970)
+			    before each filespec, separated by a tab.
 EXIT STATUS:
     0	Complete success.
     1	No files found.
@@ -55,6 +57,8 @@ do
 			shift; sentinelAge="${1:?}"; shift;;
 	--newer|-N)	shift; globs+=("$1"); shift;;
 	--count|-c)	shift; count="$1"; shift;;
+	--include-epoch|-e)
+			shift; cutter=();;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
 	*)		break;;
