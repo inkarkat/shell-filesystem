@@ -42,6 +42,8 @@ EXIT STATUS:
 HELPTEXT
 }
 
+typeset -a sortByDateThenFilespec=(sort --field-separator $'\t' -k 1,1n -k 2f)
+typeset -a cutter=(cut -f 2-)
 sentinelAge=
 typeset -a globs=()
 unset count
@@ -117,7 +119,6 @@ findLastModified()
     done
 }
 
-typeset -a sortByDateThenFilespec=(sort --field-separator $'\t' -k 1,1n -k 2f)
 if [ "$sentinelAge" ]; then
     algorithm=findNewer
     typeset -a limiter=()
@@ -131,6 +132,6 @@ do
     $algorithm "$dirspec" && status=0
 done | \
     eval '"${sortByDateThenFilespec[@]}"' \
-    "${limiter:+|}" '"${limiter[@]}"' | \
-    cut -f 2- | \
-    outputOrError
+    "${limiter:+|}" '"${limiter[@]}"' \
+    "${cutter:+|}" '"${cutter[@]}"' \
+    | outputOrError
