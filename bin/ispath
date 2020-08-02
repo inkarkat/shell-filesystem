@@ -1,0 +1,19 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+Tests whether any of the passed FILE has a directory component.
+Returns 1 if all passed FILEs are pure (existing or non-existing) filenames.
+HELPTEXT
+    printf 'Usage: %q %s\n' "$(basename "$1")" 'FILE [...] [-?|-h|--help]'
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+esac
+
+for filespec
+do
+    [ "$(basename -- "$filespec")" = "$filespec" -a "$filespec" != . -a "$filespec" != .. ] || exit 0
+done
+exit 1
