@@ -2,6 +2,7 @@
 shopt -qs extglob nullglob dotglob
 
 : ${FINDUP_FILE_MARKER:='{}'}
+fileMarker="$FINDUP_FILE_MARKER"; unset FINDUP_FILE_MARKER
 
 case ",${DEBUG:-}," in
     *,findup\!,*)	printf >&2 %s "$PS4"; printf >&2 '%q ' 'findup' "$@"; printf >&2 '\n'; exit;;
@@ -49,10 +50,10 @@ HELPDESCRIPTION
     --mindepth LEVELS	Do not test at levels less than LEVELS. --mindepth 1
 			means report any files except inside the current
 			directory.
-    --exec COMMAND ;	Execute COMMAND from the starting directory. $FINDUP_FILE_MARKER is
+    --exec COMMAND ;	Execute COMMAND from the starting directory. $fileMarker is
 			replaced with its filespec.
     --execdir COMMAND ;	Execute COMMAND from the directory containing the found
-			file. $FINDUP_FILE_MARKER is replaced with its filespec.
+			file. $fileMarker is replaced with its filespec.
 HELPTEXT
 }
 
@@ -169,9 +170,8 @@ processMatches()
 
     if [ ${#execCommand[@]} -gt 0 ]; then
 	local filespec; printf -v filespec "$@"
-	typeset -a interpolatedCommand=("${execCommand[@]//"$FINDUP_FILE_MARKER"/$filespec}")
+	typeset -a interpolatedCommand=("${execCommand[@]//"$fileMarker"/$filespec}")
 	(
-	    unset FINDUP_FILE_MARKER
 	    if [ ! "$isExecDir" ]; then
 		cd "$baseDir" || exit $?
 	    fi
