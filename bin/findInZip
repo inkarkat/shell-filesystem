@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if ! type -t unzip >/dev/null; then
+    echo >&2 'FATAL: unzip command not available.'
+    exit 3
+fi
+
+FINDINCONTAINER_WHAT='ZIP archives' \
+    FINDINCONTAINER_COMMAND="$(basename -- "$0")" \
+    FINDINCONTAINER_LOCATOR='-name "*.zip"' \
+    FINDINCONTAINER_OPENER='unzip -Z1 {}' \
+    exec findInContainer "$@"

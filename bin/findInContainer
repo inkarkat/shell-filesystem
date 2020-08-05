@@ -1,0 +1,78 @@
+#!/bin/bash
+set -o pipefail
+
+: ${FINDINCONTAINER_PREFIX_SEPARATOR:=:}
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+
+    if [ -n "$FINDINCONTAINER_COMMAND" ]; then
+	local findInWhatCommand="$FINDINCONTAINER_COMMAND"
+	local findInContainerConfiguration=
+    else
+	local findInWhatCommand="$(basename "$1")"
+	local findInContainerConfiguration='[FINDINCONTAINER_WHAT="some archives"] [FINDINCONTAINER_COMMAND=findInSomeArchives] FINDINCONTAINER_LOCATOR="FIND-ARGS" FINDINCONTAINER_OPENER="CMDLINE" '
+    fi
+    printf "Usage: %s%q %s\\n" "$findInContainerConfiguration" "$findInWhatCommand" '[--prefixed|--with-header|--with-prompt] [FIND-ARGS ...] [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Search for ${FINDINCONTAINER_WHAT:-file-system-like containers} by passing ${FINDINCONTAINER_LOCATOR:-\$FINDINCONTAINER_LOCATOR} to
+find and look inside each by passing the filespec to ${FINDINCONTAINER_OPENER:-\$FINDINCONTAINER_OPENER}.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --prefixed	    Put the container filespec before each container content
+		    line, followed by a $FINDINCONTAINER_PREFIX_SEPARATOR (like grep -H|--with-filename).
+    --with-header   Print a header containing the container filespec before the
+		    container contents.
+    --with-prompt   Emulate a full prompt (as if invoking
+		    ${FINDINCONTAINER_OPENER:-\$FINDINCONTAINER_OPENER}) before the container contents.
+EXIT STATUS:
+    0	Complete success.
+    1	Problem with find invocation.
+    2	Bad invocation, wrong or missing command-line arguments.
+HELPTEXT
+}
+
+preContext=
+postContext=
+contextCommand=
+finalFilter=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--prefixed)	shift
+			printf -v prefixSeparator %q "$FINDINCONTAINER_PREFIX_SEPARATOR"
+			contextCommand="prefix --skip-empty -- {}${prefixSeparator}"
+			;;
+	--with-header)	shift; contextCommand="withHeader --id 'findInContainer-$$' -- {}";;
+	--with-prompt)	shift
+			preContext='{ printf "%q "'
+			postContext='; printf \\n; }'
+			finalFilter='runWithPrompt --no-output-no-prompt --no-output-no-error --no-success-no-count'
+			;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+
+: ${FINDINCONTAINER_LOCATOR:?}
+: ${FINDINCONTAINER_OPENER:?}
+
+eval 'find "$@"' "$FINDINCONTAINER_LOCATOR" '-exec bash -c "${preContext}${preContext:+ }${FINDINCONTAINER_OPENER//\{\}/\"\$1\"}${postContext:+ }${postContext}${contextCommand:+|}${contextCommand}" sh {} \;' "${finalFilter:+|}${finalFilter}"
