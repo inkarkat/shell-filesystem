@@ -3,7 +3,7 @@
 printUsage()
 {
     cat <<HELPTEXT
-Tests whether any of the passed FILE has a directory component.
+Tests whether any of the passed FILE(s) has a directory component.
 Returns 1 if all passed FILEs are pure (existing or non-existing) filenames.
 HELPTEXT
     printf 'Usage: %q %s\n' "$(basename "$1")" 'FILE [...] [-?|-h|--help]'
