@@ -15,7 +15,7 @@ printShortUsage()
 	local findInWhatCommand="$(basename "$1")"
 	local findInContainerConfiguration='[FINDINCONTAINER_WHAT="some archives"] [FINDINCONTAINER_COMMAND=findInSomeArchives] FINDINCONTAINER_LOCATOR="FIND-ARGS" FINDINCONTAINER_OPENER="CMDLINE" '
     fi
-    printf "Usage: %s%q %s\\n" "$findInContainerConfiguration" "$findInWhatCommand" '[--prefixed|--with-header|--with-prompt] [FIND-ARGS ...] [-?|-h|--help]'
+    printf "Usage: %s%q %s\\n" "$findInContainerConfiguration" "$findInWhatCommand" '[--prefixed|--with-header|--with-prompt] [--filter-command COMMANDLINE [...]] [FIND-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -41,6 +41,9 @@ HELPDESCRIPTION
 		    container contents.
     --with-prompt   Emulate a full prompt (as if invoking
 		    ${FINDINCONTAINER_OPENER:-\$FINDINCONTAINER_OPENER}) before the container contents.
+    --filter-command COMMANDLINE
+		    Filter the container contents by piping it through
+		    COMMANDLINE.
 EXIT STATUS:
     0	Complete success.
     1	Problem with find invocation.
@@ -48,6 +51,7 @@ EXIT STATUS:
 HELPTEXT
 }
 
+filterCommand=
 preContext=
 postContext=
 contextCommand=
@@ -56,6 +60,8 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--filter-command)
+			shift; filterCommand="${filterCommand}|$1"; shift;;
 	--prefixed)	shift
 			printf -v prefixSeparator %q "$FINDINCONTAINER_PREFIX_SEPARATOR"
 			contextCommand="prefix --skip-empty -- {}${prefixSeparator}"
@@ -72,7 +78,14 @@ do
     esac
 done
 
+if [ -n "$filterCommand" -a -n "$postContext" ]; then
+    # For --with-prompt, the filter command itself needs to be injected into the
+    # input for runWithPrompt instead of filtering the output.
+    printf -v postContext '; printf %q\\\\n; }' "$filterCommand"
+    filterCommand=''
+fi
+
 : ${FINDINCONTAINER_LOCATOR:?}
 : ${FINDINCONTAINER_OPENER:?}
 
-eval 'find "$@"' \\\( "$FINDINCONTAINER_LOCATOR" \\\) '-exec bash -c "${preContext}${preContext:+ }${FINDINCONTAINER_OPENER//\{\}/\"\$1\"}${postContext:+ }${postContext}${contextCommand:+|}${contextCommand//\{\}/\"\$1\"}" bash {} \;' "${finalFilter:+|}${finalFilter}"
+eval 'find "$@"' \\\( "$FINDINCONTAINER_LOCATOR" \\\) '-exec bash -c "${preContext}${preContext:+ }${FINDINCONTAINER_OPENER//\{\}/\"\$1\"}${postContext:+ }${postContext}${filterCommand//\{\}/\"\$1\"}${contextCommand:+|}${contextCommand//\{\}/\"\$1\"}" bash {} \;' "${finalFilter:+|}${finalFilter}"
