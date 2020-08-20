@@ -75,4 +75,4 @@ done
 : ${FINDINCONTAINER_LOCATOR:?}
 : ${FINDINCONTAINER_OPENER:?}
 
-eval 'find "$@"' \\\( "$FINDINCONTAINER_LOCATOR" \\\) '-exec bash -c "${preContext}${preContext:+ }${FINDINCONTAINER_OPENER//\{\}/\"\$1\"}${postContext:+ }${postContext}${contextCommand:+|}${contextCommand}" sh {} \;' "${finalFilter:+|}${finalFilter}"
+eval 'find "$@"' \\\( "$FINDINCONTAINER_LOCATOR" \\\) '-exec bash -c "${preContext}${preContext:+ }${FINDINCONTAINER_OPENER//\{\}/\"\$1\"}${postContext:+ }${postContext}${contextCommand:+|}${contextCommand//\{\}/\"\$1\"}" bash {} \;' "${finalFilter:+|}${finalFilter}"
