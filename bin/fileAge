@@ -15,9 +15,9 @@ case "$1" in
 	while read -r epoch
 	do
 	    printf '%d\n' "$((now - epoch))"
-	done < <(stat -L --format %Y "$@")
+	done < <(stat -L --format %Y -- "$@")
 	;;
     *)
-	exec stat -L --format %Y "$@"
+	exec stat -L --format %Y -- "$@"
 	;;
 esac
