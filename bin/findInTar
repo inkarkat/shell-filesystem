@@ -7,6 +7,6 @@ fi
 
 FINDINCONTAINER_WHAT='tape or disk archives' \
     FINDINCONTAINER_COMMAND="$(basename -- "$0")" \
-    FINDINCONTAINER_LOCATOR='-name "*.tar" -o -name "*.tar.gz" -o -name "*.tar.bz2" -o -name "*.tgz"' \
+    FINDINCONTAINER_LOCATOR='-type f -a \( -name "*.tar" -o -name "*.tar.gz" -o -name "*.tar.bz2" -o -name "*.tgz" \)' \
     FINDINCONTAINER_OPENER='tar -tf {}' \
     exec findInContainer "$@"
