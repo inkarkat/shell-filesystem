@@ -1,7 +1,7 @@
 #!/bin/bash
 shopt -qs extglob nullglob dotglob
 
-: ${FINDUP_FILE_MARKER:='{}'}
+: ${FINDUP_FILE_MARKER='{}'}
 fileMarker="$FINDUP_FILE_MARKER"; unset FINDUP_FILE_MARKER
 
 case ",${DEBUG:-}," in
@@ -50,8 +50,8 @@ HELPDESCRIPTION
     --mindepth LEVELS	Do not test at levels less than LEVELS. --mindepth 1
 			means report any files except inside the current
 			directory.
-    --exec COMMAND ;	Execute COMMAND from the starting directory. $fileMarker is
-			replaced with its filespec.
+    --exec COMMAND ;	Execute COMMAND from the starting directory.${fileMarker:+ $fileMarker is
+			replaced with its filespec.}
     --execdir COMMAND ;	Execute COMMAND from the directory containing the found
 			file. $fileMarker is replaced with its filespec.
 HELPTEXT
