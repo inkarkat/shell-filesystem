@@ -22,7 +22,7 @@ printUsage()
     # This is the short help when launched with no or incorrect arguments.
     # It is printed to stderr to avoid accidental processing.
     printShortUsage "$1" >&2
-    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
 }
 printLongUsage()
 {
@@ -73,7 +73,7 @@ do
 			finalFilter='runWithPrompt --no-output-no-prompt --no-output-no-error --no-success-no-count'
 			;;
 	--)		shift; break;;
-	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
     esac
 done

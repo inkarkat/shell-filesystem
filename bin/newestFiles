@@ -12,7 +12,7 @@ printUsage()
     # This is the short help when launched with no or incorrect arguments.
     # It is printed to stderr to avoid accidental processing.
     printShortUsage "$1" >&2
-    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
 }
 printLongUsage()
 {
@@ -60,7 +60,7 @@ do
 	--include-epoch|-e)
 			shift; cutter=();;
 	--)		shift; break;;
-	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
     esac
 done
@@ -73,12 +73,12 @@ if [ ${#globs[@]} -gt 0 ]; then
     if [ -n "$sentinelAge" ]; then
 	echo 'ERROR: Cannot combine --newer-than with --newer.'
 	echo
-	printShortUsage "$0"
+	printUsage "$0"
 	exit 2
     elif [ -n "${count+t}" ]; then
 	echo 'ERROR: Cannot combine --newer with --count.'
 	echo
-	printShortUsage "$0"
+	printUsage "$0"
 	exit 2
     fi >&2
 
@@ -95,7 +95,7 @@ if [ ${#globs[@]} -gt 0 ]; then
 elif [ -n "${count+t}" -a -n "$sentinelAge" ]; then
     echo 'ERROR: Cannot combine --newer-than with --count.'
     echo
-    printShortUsage "$0"
+    printUsage "$0"
     exit 2
 fi
 [ $# -gt 0 ] || set -- "$PWD"
