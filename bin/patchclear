@@ -1,2 +1,24 @@
 #!/bin/bash
-exec find "${1:-.}" \( -name '*.rej' -o -name '*.orig' \) -print -delete
+
+printUsage()
+{
+    cat <<HELPTEXT
+Delete (unless -n|--dry-run is given) (and print, unless -q|--quiet is given)
+rejected (*.rej) patch hunks and original files (*.orig) to clean up after
+patching file(s). The current working directory tree / all files found by
+FIND-ARGS are processed.
+HELPTEXT
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-n|--dry-run|-q|--quiet] [FIND-ARGS ...] [-?|-h|--help]'
+}
+
+isPrint=t
+isDelete=t
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+    --dry-run|-n)	shift; isDelete=;;
+    --quiet|-q)		shift; isPrint=;;
+esac
+
+
+exec find "${@:-.}" \( -name '*.rej' -o -name '*.orig' \) ${isPrint:+-print} ${isDelete:+-delete}
