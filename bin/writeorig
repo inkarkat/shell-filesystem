@@ -1,26 +1,58 @@
 #!/bin/bash
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--delete-original] [--] FILE [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--delete-original] --ignore-no-files [--] [FILE [...]] [-?|-h|--help]'
+}
 printUsage()
 {
-    cat <<HELPTEXT
-Write a single backup of FILE to FILE.orig. Unless -f|--overwrite is given, does
-nothing if the backup already exists. Ignores passed directories and *.orig files.
-HELPTEXT
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Write a single backup of FILE to FILE.orig. Ignores passed directories and
+*.orig files.
+HELPDESCRIPTION
     echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--] FILE [...] [-?|-h|--help]'
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] --ignore-no-files [--] [FILE [...]] [-?|-h|--help]'
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --overwrite|-f		Overwrite an existing backup.
+    --keep|-k			Do nothing if the backup already exists
+				(default behavior).
+    --delete-original		Removes the original FILE after creatin
+				FILE.orig; you can use this for a final backup
+				before getting rid of the FILE.
+EXIT STATUS:
+    0	Complete success.
+    1	Failed to backup any file(s).
+    2	Partial success; some file(s) could not be backed up.
+    3	Bad invocation, wrong or missing command-line arguments.
+HELPTEXT
 }
 
 isOverwrite=
 isIgnoreNoFiles=
+isDeleteOriginal=
 while [ $# -ne 0 ]
 do
     case "$1" in
-	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--overwrite|-f)	shift; isOverwrite=t;;
 	--keep|-k)	shift; isOverwrite=;;
 	--ignore-no-files)
 			shift; isIgnoreNoFiles=t;;
+	--delete-original)
+			shift; isDeleteOriginal=t;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 3;;
     esac
@@ -50,6 +82,11 @@ writebackup()
 	    umask 0111	# Drop the execute permission on the backup.
 	    cp -- "${filespec}" "${backupFilespec}" || return 1
 	    printf 'Backed up to %s%s\n' "$backupDir" "$(basename -- "${backupFilespec}")"
+
+	    if [ "$isDeleteOriginal" ]; then
+		rm --force -- "${filespec}" || return 1
+		printf 'Deleted original %s\n' "$filespec"
+	    fi
 
 	    return 0
 	else
