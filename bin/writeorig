@@ -1,0 +1,67 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+Write a single backup of FILE to FILE.orig. Unless -f|--overwrite is given, does
+nothing if the backup already exists.
+HELPTEXT
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--] FILE [...] [-?|-h|--help]'
+}
+
+isOverwrite=
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+    --overwrite|-f)	shift; isOverwrite=t;;
+    --keep|-k)		shift; isOverwrite=;;
+    --)			shift;;
+    -*)			{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 3;;
+esac
+if [ $# -eq 0 ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
+
+writebackup()
+{
+    local -r filespec="$1"
+
+    if [ -f "$filespec" ]; then
+	if [ ! -r "$filespec" ]; then
+	    printf >&2 'ERROR: "%s" is not readable!\n' "$filespec"
+	    return 1
+	fi
+	local -r backupFilespec="${filespec}.orig"
+	if [ "${backupFilespec}" ]; then
+	    if [ ! "$isOverwrite" ] && [ -f "$backupFilespec" ]; then
+		return 1
+	    fi
+
+	    umask 0111	# Drop the execute permission on the backup.
+	    cp -- "${filespec}" "${backupFilespec}" || return 1
+	    printf 'Backed up to %s%s\n' "$backupDir" "$(basename -- "${backupFilespec}")"
+
+	    return 0
+	else
+	    return 1
+	fi
+    else
+	printf >&2 'ERROR: "%s" does not exist!\n' "$filespec"
+	return 1
+    fi
+}
+
+
+isSuccess=
+isFailure=
+
+while [ $# -ne 0 ]
+do
+    writebackup "$1" && isSuccess=t || isFailure=t
+    shift
+done
+
+if [ "$isFailure" ]; then
+    [ "$isSuccess" ] && exit 2 || exit 1
+fi
