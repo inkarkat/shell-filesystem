@@ -8,17 +8,24 @@ nothing if the backup already exists. Ignores passed directories and *.orig file
 HELPTEXT
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--] FILE [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] --ignore-no-files [--] [FILE [...]] [-?|-h|--help]'
 }
 
 isOverwrite=
-case "$1" in
-    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-    --overwrite|-f)	shift; isOverwrite=t;;
-    --keep|-k)		shift; isOverwrite=;;
-    --)			shift;;
-    -*)			{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 3;;
-esac
-if [ $# -eq 0 ]; then
+isIgnoreNoFiles=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--overwrite|-f)	shift; isOverwrite=t;;
+	--keep|-k)	shift; isOverwrite=;;
+	--ignore-no-files)
+			shift; isIgnoreNoFiles=t;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 3;;
+    esac
+done
+if [ $# -eq 0 ] && [ ! "$isIgnoreNoFiles" ]; then
     printUsage "$0" >&2
     exit 2
 fi
