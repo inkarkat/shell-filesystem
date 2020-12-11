@@ -4,7 +4,7 @@ printUsage()
 {
     cat <<HELPTEXT
 Write a single backup of FILE to FILE.orig. Unless -f|--overwrite is given, does
-nothing if the backup already exists.
+nothing if the backup already exists. Ignores passed directories and *.orig files.
 HELPTEXT
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--] FILE [...] [-?|-h|--help]'
@@ -27,6 +27,8 @@ writebackup()
 {
     local -r filespec="$1"
 
+    [[ "$filespec" = *.orig ]] && return 1  # Don't backup original files themselves; this allows passing a generic glob like * to it.
+
     if [ -f "$filespec" ]; then
 	if [ ! -r "$filespec" ]; then
 	    printf >&2 'ERROR: "%s" is not readable!\n' "$filespec"
@@ -46,6 +48,9 @@ writebackup()
 	else
 	    return 1
 	fi
+    elif [ -d "$filespec" ]; then
+	# Ignore passed directories.
+	return 1
     else
 	printf >&2 'ERROR: "%s" does not exist!\n' "$filespec"
 	return 1
