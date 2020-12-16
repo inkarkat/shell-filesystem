@@ -55,6 +55,7 @@ do
 			shift; isDeleteOriginal=t;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 3;;
+	*)		break;;
     esac
 done
 if [ $# -eq 0 ] && [ ! "$isIgnoreNoFiles" ]; then
