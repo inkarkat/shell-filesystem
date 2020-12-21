@@ -17,4 +17,6 @@ if [ $# -eq 0 ]; then
 fi
 
 typeset lastArg="${!#}"
-exec diff -u "${@:1:$(($#-1))}" "$lastArg"{.orig,}
+diffCommand=diff; [ -t 1 ] && exists colordiff && diffCommand=colordiff
+typeset -a pager=("${PAGER:-less}" --quit-if-one-screen --RAW-CONTROL-CHARS); [ -t 1 ] || pager=()
+eval '"$diffCommand" -u "${@:1:$(($#-1))}" "$lastArg"{.orig,}' "${pager:+|}" '"${pager[@]}"'
