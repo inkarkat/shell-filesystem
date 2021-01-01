@@ -29,9 +29,13 @@ HELPDESCRIPTION
     --overwrite|-f		Overwrite an existing backup.
     --keep|-k			Do nothing if the backup already exists
 				(default behavior).
-    --delete-original		Removes the original FILE after creatin
+    --delete-original		Removes the original FILE after creating
 				FILE.orig; you can use this for a final backup
 				before getting rid of the FILE.
+    --ignore-no-files		Do not complain when no FILE(s) have been
+				passed. Useful when passing a glob that may
+				resolve to no files at all, and that is
+				acceptable.
 EXIT STATUS:
     0	Complete success.
     1	Failed to backup any file(s).
