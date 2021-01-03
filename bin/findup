@@ -29,7 +29,7 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Locate a FILE or matches for 'GLOB' in parent directories (from the current
+Locate a FILE or matches for GLOB in parent directories (from the current
 directory or passed STARTING-POINT(s), up to the root directory), and print its
 / their full path(s). Each STARTING-POINT must be an existing directory or at
 least have an existing (grand-...)parent directory.
@@ -182,15 +182,13 @@ processMatches()
 }
 processGlobMatches()
 {
-    typeset -a files=($@)
-    # If globbing didn't yield anything, we've failed.
-    ((${#files[@]})) || return 1
-    # Still need to check for existing files; in case a GLOB without a wildcard was
-    # passed, it's not eliminated by nullglob.
+    typeset -a filespecs=()
+    readarray -t filespecs < <(expandglob -- "$@")
+    [ ${#filespecs[@]} -eq 0 ] && return 1
+
     local status=1
-    for f in "${files[@]}"
+    for f in "${filespecs[@]}"
     do
-	[ -e "$f" ] || continue
 	processMatches '%s/%s' "${PWD%/}" "$f" && status=0
     done
     return $status
