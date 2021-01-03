@@ -73,7 +73,7 @@ if [ ${#globs[@]} -gt 0 ]; then
     readarray -t globbedFilespecs < <(expandglob -- "${globs[@]}")
     for globResult in "${globbedFilespecs[@]}"
     do
-	[ -e "$globResult" ] && sentinels["$(basename -- "$globResult")"]=1
+	[ -e "$globResult" ] && sentinels["${globResult##*/}"]=1
     done
     if [ ${#sentinels[@]} -eq 0 ]; then
 	if [ -n "$sentinelMissingCount" ]; then
@@ -92,7 +92,7 @@ findAfter()
     local i filename lastIndex=$((${#filespecs[@]} - 1))
     for ((i = lastIndex; i >= 0; i--))
     do
-	filename="$(basename -- "${filespecs[$i]}")" || continue
+	filename="${filespecs[$i]##*/}" || continue
 	[ -n "$filename" ] && [ "${sentinels["$filename"]}" ] && break
     done
     [ $i -ge 0 -a $i -lt $lastIndex ] || return 1
