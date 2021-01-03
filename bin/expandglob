@@ -1,0 +1,37 @@
+#!/bin/bash
+shopt -qs extglob nullglob dotglob
+
+printUsage()
+{
+    cat <<HELPTEXT
+Print a list of FILE(s) that exist and files matching GLOB(s). If an argument
+both represents an existing file and also matches as a glob, both literal file
+and glob results are returned.
+HELPTEXT
+printf 'Usage: %q %s\n' "$(basename "$1")" "[--] FILE|'GLOB' [...] [-?|-h|--help]"
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+    --)			shift;;
+esac
+if [ $# -eq 0 ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
+
+typeset -a result=()
+for arg
+do
+    [ -e "$arg" ] && result+=("$arg")
+
+    # Still need to check for existing files; in case a GLOB without a wildcard
+    # was passed, it's not eliminated by nullglob.
+    eval "typeset -a files=($arg)"
+    for f in "${files[@]}"
+    do
+	[ -e "$f" ] && result+=("$f")
+    done
+done
+
+[ ${#result[@]} -eq 0 ] && exit 1
+printf '%s\n' "${result[@]}" | sort --unique
