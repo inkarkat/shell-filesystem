@@ -20,7 +20,9 @@ printLongUsage()
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
 Print the filespecs of the alphabetically last file(s) in the current directory
-/ in each passed DIRSPEC.
+/ in each passed DIRSPEC / within each passed FILESPEC, considering only the
+filename itself (i.e. ignoring any path components, except to determine the
+precedence for identical filenames).
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -87,8 +89,6 @@ fi
 
 findAfter()
 {
-    local dirspec="${1:?}"; shift
-    typeset -a filespecs=("$dirspec"/*)
     local i filename lastIndex=$((${#filespecs[@]} - 1))
     for ((i = lastIndex; i >= 0; i--))
     do
@@ -101,24 +101,30 @@ findAfter()
 
 findLast()
 {
-    local dirspec="${1:?}"; shift
-    typeset -a filespecs=("$dirspec"/*)
     lastIndex=$((${#filespecs[@]} - $count)); [ $lastIndex -lt 0 ] && lastIndex=0
     typeset -a lastFilespecs=("${filespecs[@]:$lastIndex}")
     [ ${#lastFilespecs[@]} -gt 0 ] || return 1
     printf '%s\n' "${lastFilespecs[@]}"
 }
 
-status=1
+typeset -a basenameAndFilespecs=()
+for dirOrFile
+do
+    if [ -d "$dirOrFile" ]; then
+	for filespec in "$dirOrFile"/*
+	do
+	    [ -d "$filespec" ] || basenameAndFilespecs+=("${filespec##*/}/$filespec")
+	done
+    elif [ -e "$dirOrFile" ]; then
+	basenameAndFilespecs+=("${dirOrFile##*/}/$dirOrFile")
+    fi
+done
+[ ${#basenameAndFilespecs[@]} -eq 0 ] && exit 1
+
+readarray -t filespecs < <(printf '%s\n' "${basenameAndFilespecs[@]}" | sort --unique | cut -d / -f 2-)
+
 if [ ${#globs[@]} -gt 0 ]; then
-    for dirspec
-    do
-	findAfter "$dirspec" && status=0
-    done
+    findAfter
 else
-    for dirspec
-    do
-	findLast "$dirspec" && status=0
-    done
+    findLast
 fi
-exit $status
