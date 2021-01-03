@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-t|--newer-than EPOCH|-N|--newer FILE|'GLOB' [...]|-c|--count N] [-e|--include-epoch] [--] [DIRSPEC [...]] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-t|--newer-than EPOCH|-N|--newer FILE|'GLOB' [...]|-c|--count N] [-e|--include-epoch] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -20,8 +20,8 @@ printLongUsage()
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
 Print the filespecs of the last modified file(s) in the current directory / in
-each passed DIRSPEC. Output order is globally sorted by modification date,
-ascending.
+each passed DIRSPEC / within each passed FILESPEC. Output order is globally
+sorted by modification date, ascending.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -104,9 +104,17 @@ fi
 
 findNewer()
 {
-    local dirspec="${1:?}"; shift
+    local dirOrFile="${1:?}"; shift
+    if [ -d "$dirOrFile" ]; then
+	typeset -a files=("$dirOrFile"/*)
+    elif [ -e "$dirOrFile" ]; then
+	typeset -a files=("$dirOrFile")
+    else
+	return
+    fi
+
     local filespec
-    for filespec in "$dirspec"/*
+    for filespec in "${files[@]}"
     do
 	age=$(fileAge "$filespec")
 	[ $age -gt $sentinelAge ] && printf '%d\t%s\n' "$age" "$filespec"
@@ -115,9 +123,17 @@ findNewer()
 
 findLastModified()
 {
-    local dirspec="${1:?}"; shift
+    local dirOrFile="${1:?}"; shift
+    if [ -d "$dirOrFile" ]; then
+	typeset -a files=("$dirOrFile"/*)
+    elif [ -e "$dirOrFile" ]; then
+	typeset -a files=("$dirOrFile")
+    else
+	return
+    fi
+
     local filespec
-    for filespec in "$dirspec"/*
+    for filespec in "${files[@]}"
     do
 	age=$(fileAge "$filespec")
 	printf '%d\t%s\n' "$age" "$filespec"
