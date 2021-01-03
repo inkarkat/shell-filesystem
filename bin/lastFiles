@@ -68,7 +68,8 @@ if [ ${#globs[@]} -gt 0 ]; then
     fi >&2
 
     typeset -A sentinels=()
-    for globResult in ${globs[@]}
+    readarray -t globbedFilespecs < <(expandglob -- "${globs[@]}")
+    for globResult in "${globbedFilespecs[@]}"
     do
 	[ -e "$globResult" ] && sentinels["$(basename -- "$globResult")"]=1
     done

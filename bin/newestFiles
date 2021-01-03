@@ -83,7 +83,8 @@ if [ ${#globs[@]} -gt 0 ]; then
     fi >&2
 
     sentinelAge=-1
-    for globResult in ${globs[@]}
+    readarray -t globbedFilespecs < <(expandglob -- "${globs[@]}")
+    for globResult in "${globbedFilespecs[@]}"
     do
 	age=$(fileAge "$globResult")
 	[ $age -gt $sentinelAge ] && sentinelAge=$age
