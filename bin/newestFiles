@@ -104,17 +104,8 @@ fi
 
 findNewer()
 {
-    local dirOrFile="${1:?}"; shift
-    if [ -d "$dirOrFile" ]; then
-	typeset -a files=("$dirOrFile"/*)
-    elif [ -e "$dirOrFile" ]; then
-	typeset -a files=("$dirOrFile")
-    else
-	return
-    fi
-
     local filespec
-    for filespec in "${files[@]}"
+    for filespec in "${filespecs[@]}"
     do
 	age=$(fileAge "$filespec")
 	[ $age -gt $sentinelAge ] && printf '%d\t%s\n' "$age" "$filespec"
@@ -123,17 +114,8 @@ findNewer()
 
 findLastModified()
 {
-    local dirOrFile="${1:?}"; shift
-    if [ -d "$dirOrFile" ]; then
-	typeset -a files=("$dirOrFile"/*)
-    elif [ -e "$dirOrFile" ]; then
-	typeset -a files=("$dirOrFile")
-    else
-	return
-    fi
-
     local filespec
-    for filespec in "${files[@]}"
+    for filespec in "${filespecs[@]}"
     do
 	age=$(fileAge "$filespec")
 	printf '%d\t%s\n' "$age" "$filespec"
@@ -148,10 +130,18 @@ else
     typeset -a limiter=(tail -n "$count")
 fi
 
-for dirspec
+typeset -a filespecs=()
+for dirOrFile
 do
-    $algorithm "$dirspec" && status=0
-done | \
+    if [ -d "$dirOrFile" ]; then
+	filespecs+=("$dirOrFile"/*)
+    elif [ -e "$dirOrFile" ]; then
+	filespecs+=("$dirOrFile")
+    fi
+done
+[ ${#filespecs[@]} -eq 0 ] && exit 1
+
+$algorithm | \
     eval '"${sortByDateThenFilespec[@]}"' \
     "${limiter:+|}" '"${limiter[@]}"' \
     "${cutter:+|}" '"${cutter[@]}"' \
