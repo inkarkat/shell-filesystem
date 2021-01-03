@@ -13,7 +13,7 @@ case "$1" in
 esac
 [ $# -eq 1 ] || { printUsage "$0" >&2; exit 2; }
 
-typeset -a files=($@)
+eval "typeset -a files=($*)"
 # If globbing didn't yield anything, we've failed.
 ((${#files[@]})) || exit 1
 # Still need to check for existing files; in case a GLOB without a wildcard was
