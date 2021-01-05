@@ -110,10 +110,9 @@ writebackup()
 isSuccess=
 isFailure=
 
-while [ $# -ne 0 ]
+for filespec
 do
-    writebackup "$1" && isSuccess=t || isFailure=t
-    shift
+    writebackup "$filespec" && isSuccess=t || isFailure=t
 done
 
 if [ "$isFailure" ]; then

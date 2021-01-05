@@ -65,14 +65,13 @@ fi
 isSuccess=
 isFailure=
 
-while [ $# -ne 0 ]
+for filespec
 do
-    if writeorig --keep -- "$1" || writebackup "${writebackupArgs[@]}" -- "$1"; then
+    if writeorig --keep -- "$filespec" || writebackup "${writebackupArgs[@]}" -- "$filespec"; then
 	isSuccess=t
     else
 	isFailure=t
     fi
-    shift
 done
 
 if [ "$isFailure" ]; then
