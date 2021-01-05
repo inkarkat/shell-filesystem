@@ -1,0 +1,80 @@
+#!/bin/bash
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--once-today] [--] FILE [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--once-today] --ignore-no-files [--] [FILE [...]] [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+If a FILE.orig backup already exists, writes subsequent backups of the current
+file with a 'current date + counter' file extension (format '.YYYYMMDD[a-z]').
+If no FILE.orig backup already exists, writes a single backup of FILE to
+FILE.orig. Ignores passed directories and *.orig files.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --ignore-no-files		Do not complain when no FILE(s) have been
+				passed. Useful when passing a glob that may
+				resolve to no files at all, and that is
+				acceptable.
+    --once-today                A FILE is only backed up if no backup on the
+                                current day was already made.
+EXIT STATUS:
+    0	Complete success.
+    1	Failed to backup any file(s).
+    2	Partial success; some file(s) could not be backed up.
+    3	Bad invocation, wrong or missing command-line arguments.
+HELPTEXT
+}
+
+isIgnoreNoFiles=
+typeset -a writebackupArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--ignore-no-files)
+			shift; isIgnoreNoFiles=t;;
+	--once-today)	writebackupArgs+=("$1"); shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 3;;
+	*)		break;;
+    esac
+done
+if [ $# -eq 0 ] && [ ! "$isIgnoreNoFiles" ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
+
+
+isSuccess=
+isFailure=
+
+while [ $# -ne 0 ]
+do
+    if writeorig --keep -- "$1" || writebackup "${writebackupArgs[@]}" -- "$1"; then
+	isSuccess=t
+    else
+	isFailure=t
+    fi
+    shift
+done
+
+if [ "$isFailure" ]; then
+    [ "$isSuccess" ] && exit 2 || exit 1
+fi
