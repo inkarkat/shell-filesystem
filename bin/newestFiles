@@ -54,7 +54,14 @@ do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--newer-than|-t)
-			shift; sentinelAge="${1:?}"; shift;;
+			shift; sentinelAge="$1"; shift
+			if [[ ! "$sentinelAge" =~ ^[0-9]+$ ]]; then
+			    printf 'ERROR: Invalid EPOCH: %s\n' "$sentinelAge"
+			    echo
+			    printUsage "$0"
+			    exit 2
+			fi >&2
+			;;
 	--newer|-N)	shift; globs+=("$1"); shift;;
 	--count|-c)	shift; count="$1"; shift;;
 	--include-epoch|-e)
