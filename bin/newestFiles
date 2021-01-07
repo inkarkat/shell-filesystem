@@ -33,7 +33,7 @@ HELPDESCRIPTION
 			    has such a file). Output order is globally sorted by
 			    modification date, ascending.
     --count|-c N	    Print the last N modified files (or fewer if not
-			    available) instead of just the last one.
+			    available) instead of just the last one / all newer.
     --include-epoch|-e	    Put the file modification date (seconds since 1970)
 			    before each filespec, separated by a tab.
 EXIT STATUS:
@@ -75,11 +75,6 @@ if [ ${#globs[@]} -gt 0 ]; then
 	echo
 	printUsage "$0"
 	exit 2
-    elif [ -n "${count+t}" ]; then
-	echo 'ERROR: Cannot combine --newer with --count.'
-	echo
-	printUsage "$0"
-	exit 2
     fi >&2
 
     sentinelAge=-1
@@ -93,14 +88,8 @@ if [ ${#globs[@]} -gt 0 ]; then
 	printf >&2 'No sentinel files have been found for %s\n' "${globs[*]}"
 	exit 4
     fi
-elif [ -n "${count+t}" -a -n "$sentinelAge" ]; then
-    echo 'ERROR: Cannot combine --newer-than with --count.'
-    echo
-    printUsage "$0"
-    exit 2
 fi
 [ $# -gt 0 ] || set -- "$PWD"
-: ${count:=1}
 
 findNewer()
 {
@@ -124,11 +113,11 @@ findLastModified()
 
 if [ "$sentinelAge" ]; then
     algorithm=findNewer
-    typeset -a limiter=()
 else
+    : ${count:=1}
     algorithm=findLastModified
-    typeset -a limiter=(tail -n "$count")
 fi
+typeset -a limiter=(); [ -n "$count" ] && limiter=(tail -n "$count")
 
 typeset -a filespecs=()
 for dirOrFile
