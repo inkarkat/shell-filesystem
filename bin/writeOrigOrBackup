@@ -6,6 +6,8 @@ printShortUsage()
     # skim the long one.
     printf 'Usage: %q %s\n' "$(basename "$1")" '[--delete-original] [--once-today] [--] FILE [...] [-?|-h|--help]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '[--delete-original] [--once-today] --ignore-no-files [--] [FILE [...]] [-?|-h|--help]'
+    echo
+    printf 'Usage: sed -i"$(%q %s)" -e ... FILE\n' "$(basename "$1")" '[--once-today] --get-extension FILE'
 }
 printUsage()
 {
@@ -37,6 +39,8 @@ HELPDESCRIPTION
 				acceptable.
     --once-today                A FILE is only backed up if no backup on the
                                 current day was already made.
+    --get-extension		Just print the backup extension (or nothing if
+				--once-today and a backup already exists).
 EXIT STATUS:
     0	Complete success.
     1	Failed to backup any file(s).
@@ -46,6 +50,8 @@ HELPTEXT
 }
 
 isIgnoreNoFiles=
+isDeleteOriginal=
+isOnlyPrintExtension=
 typeset -a anyBackupArgs=()
 typeset -a writebackupArgs=()
 while [ $# -ne 0 ]
@@ -53,19 +59,31 @@ do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--delete-original)
-			anyBackupArgs+=("$1"); shift;;
+			anyBackupArgs+=("$1"); shift; isDeleteOriginal=t;;
 	--once-today)	writebackupArgs+=("$1"); shift;;
 	--ignore-no-files)
 			shift; isIgnoreNoFiles=t;;
+	--get-extension)
+			anyBackupArgs+=("$1"); shift; isOnlyPrintExtension=t;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 3;;
 	*)		break;;
     esac
 done
 if [ $# -eq 0 ] && [ ! "$isIgnoreNoFiles" ]; then
-    printUsage "$0" >&2
+    printUsage "$0"
     exit 2
-fi
+elif [ "$isOnlyPrintExtension" ] && [ $# -ne 1 ]; then
+    echo 'ERROR: Only a single FILE can be passed with --get-extension.'
+    echo
+    printUsage "$0"
+    exit 2
+elif [ "$isOnlyPrintExtension" ] && [ "$isDeleteOriginal" ]; then
+    echo 'ERROR: Cannot combine --get-extension and --delete-original.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
 
 
 isSuccess=
