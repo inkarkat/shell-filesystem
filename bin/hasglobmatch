@@ -11,7 +11,10 @@ printf 'Usage: %q %s\n' "$(basename "$1")" "'GLOB' [...] [-?|-h|--help]"
 case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
 esac
-[ $# -eq 1 ] || { printUsage "$0" >&2; exit 2; }
+if [ $# -eq 0 ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
 
 eval "typeset -a files=($*)"
 # If globbing didn't yield anything, we've failed.
