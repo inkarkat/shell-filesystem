@@ -1,0 +1,45 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+Replaces a symlink with a copy of the link target. (So that the latter can be
+edited without modifying the link source as well.)
+HELPTEXT
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" 'SYMLINK-FILE [...] [-?|-h|--help]'
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+esac
+if [ $# -eq 0 ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
+
+status=0
+for symlinkFilespec
+do
+    if [ ! -e "$symlinkFilespec" ]; then
+	printf >&2 'ERROR: No such file or directory: %s\n' "$symlinkFilespec"
+	status=1
+	continue
+    elif [ ! -h "$symlinkFilespec" ]; then
+	printf >&2 'ERROR: Not a symlink: %s\n' "$symlinkFilespec"
+	status=1
+	continue
+    elif [ -d "$symlinkFilespec" ]; then
+	printf >&2 'ERROR: Cannot break directories: %s\n' "$symlinkFilespec"
+	status=1
+	continue
+    fi
+
+    dirspec="$(dirname -- "$symlinkFilespec")"
+    filename="$(basename -- "$symlinkFilespec")"
+    tempFilespec="${dirspec}/.${filename}~"
+
+    cp --dereference --preserve=all --no-clobber -- "$symlinkFilespec" "$tempFilespec" && \
+	mv --force -- "$tempFilespec" "$symlinkFilespec" || \
+	status=$?
+done
+exit $status
