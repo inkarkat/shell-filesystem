@@ -4,10 +4,10 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--delete-original] [--] FILE [...] [-?|-h|--help]'
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--delete-original] --ignore-no-files [--] [FILE [...]] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--delete-original] [--] FILE|DIR [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--delete-original] --ignore-no-files [--] [FILE|DIR [...]] [-?|-h|--help]'
     echo
-    printf 'Usage: sed -i"$(%q %s)" -e ... FILE\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] --get-extension FILE'
+    printf 'Usage: sed -i"$(%q %s)" -e ... FILE|DIR\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] --get-extension FILE|DIR'
 }
 printUsage()
 {
@@ -21,8 +21,7 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Write a single backup of FILE to FILE.orig. Ignores passed directories and
-*.orig files.
+Write a single backup of FILE to FILE.orig. Ignores *.orig files.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -73,7 +72,7 @@ if [ $# -eq 0 ] && [ ! "$isIgnoreNoFiles" ]; then
     printUsage "$0"
     exit 2
 elif [ "$isOnlyPrintExtension" ] && [ $# -ne 1 ]; then
-    echo 'ERROR: Only a single FILE can be passed with --get-extension.'
+    echo 'ERROR: Only a single FILE|DIR can be passed with --get-extension.'
     echo
     printUsage "$0"
     exit 2
@@ -90,14 +89,14 @@ writebackup()
 
     [[ "$filespec" = *.orig ]] && return 1  # Don't backup original files themselves; this allows passing a generic glob like * to it.
 
-    if [ -f "$filespec" ]; then
+    if [ -e "$filespec" ]; then
 	if [ ! -r "$filespec" ]; then
 	    printf >&2 'ERROR: "%s" is not readable!\n' "$filespec"
 	    return 1
 	fi
 	local -r backupFilespec="${filespec}.orig"
 	if [ "${backupFilespec}" ]; then
-	    if [ ! "$isOverwrite" ] && [ -f "$backupFilespec" ]; then
+	    if [ ! "$isOverwrite" ] && [ -e "$backupFilespec" ]; then
 		return 1
 	    fi
 	    if [ "$isOnlyPrintExtension" ]; then
@@ -105,22 +104,32 @@ writebackup()
 		return 0
 	    fi
 
-	    umask 0111	# Drop the execute permission on the backup.
-	    cp -- "${filespec}" "${backupFilespec}" || return 1
-	    printf 'Backed up to %s%s\n' "$backupDir" "$(basename -- "${backupFilespec}")"
+	    if [ -f "$filespec" ]; then
+		umask 0111	# Drop the execute permission on the backup.
+		cp -- "${filespec}" "${backupFilespec}" || return 1
+		printf 'Backed up to %s%s\n' "$backupDir" "$(basename -- "${backupFilespec}")"
 
-	    if [ "$isDeleteOriginal" ]; then
-		rm --force -- "${filespec}" || return 1
-		printf 'Deleted original %s\n' "$filespec"
+		if [ "$isDeleteOriginal" ]; then
+		    rm --force -- "${filespec}" || return 1
+		    printf 'Deleted original %s\n' "$filespec"
+		fi
+
+		return 0
+	    elif [ -d "$filespec" ]; then
+		if [ "$isDeleteOriginal" ]; then
+		    mv --force -- "${filespec}" "${backupFilespec}" || return 1
+		    printf 'Moved original directory to %s%s\n' "$backupDir" "$(basename -- "${backupFilespec}")"
+		else
+		    cp --archive --no-target-directory --force -- "${filespec}" "${backupFilespec}" || return 1
+		    printf 'Copied directory to %s%s\n' "$backupDir" "$(basename -- "${backupFilespec}")"
+		fi
+	    else
+		# Ignore anything else?!
+		return 1
 	    fi
-
-	    return 0
 	else
 	    return 1
 	fi
-    elif [ -d "$filespec" ]; then
-	# Ignore passed directories.
-	return 1
     else
 	printf >&2 'ERROR: "%s" does not exist!\n' "$filespec"
 	return 1
