@@ -7,7 +7,7 @@ printShortUsage()
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--delete-original] [--] FILE|DIR [...] [-?|-h|--help]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--delete-original] --ignore-no-files [--] [FILE|DIR [...]] [-?|-h|--help]'
     echo
-    printf 'Usage: sed -i"$(%q %s)" -e ... FILE|DIR\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] --get-extension [--] FILE|DIR'
+    printf 'Usage: sed -i"$(%q %s)" -e ... FILE|DIR\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] --get-extension [--accept-nonexisting] [--] FILE|DIR'
 }
 printUsage()
 {
@@ -39,6 +39,11 @@ HELPDESCRIPTION
 				acceptable.
     --get-extension		Just print the .orig backup extension (or
 				nothing if --keep and a backup already exists).
+    --accept-nonexisting	Do not print an error if FILE does not exist,
+				but simply print the would-be backup extension.
+				Useful for direct-backup use cases where there's
+				either no original file or it is located
+				somewhere else.
 EXIT STATUS:
     0	Complete success.
     1	Failed to backup any file(s).
@@ -51,6 +56,7 @@ isOverwrite=
 isIgnoreNoFiles=
 isDeleteOriginal=
 isOnlyPrintExtension=
+isAcceptNonexisting=
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -63,6 +69,8 @@ do
 			shift; isDeleteOriginal=t;;
 	--get-extension)
 			shift; isOnlyPrintExtension=t;;
+	--accept-nonexisting)
+			shift; isAcceptNonexisting=t;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 3;;
 	*)		break;;
@@ -130,6 +138,8 @@ writebackup()
 	else
 	    return 1
 	fi
+    elif [ "$isOnlyPrintExtension" ] && [ "$isAcceptNonexisting" ]; then
+	printf '.orig\n'
     else
 	printf >&2 'ERROR: "%s" does not exist!\n' "$filespec"
 	return 1

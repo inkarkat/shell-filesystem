@@ -7,7 +7,7 @@ printShortUsage()
     printf 'Usage: %q %s\n' "$(basename "$1")" '[--delete-original] [--once-today] [--] FILE [...] [-?|-h|--help]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '[--delete-original] [--once-today] --ignore-no-files [--] [FILE [...]] [-?|-h|--help]'
     echo
-    printf 'Usage: sed -i"$(%q %s)" -e ... FILE\n' "$(basename "$1")" '[--once-today] --get-extension [--] FILE'
+    printf 'Usage: sed -i"$(%q %s)" -e ... FILE\n' "$(basename "$1")" '[--once-today] --get-extension [--accept-nonexisting] [--] FILE'
 }
 printUsage()
 {
@@ -65,6 +65,8 @@ do
 			shift; isIgnoreNoFiles=t;;
 	--get-extension)
 			anyBackupArgs+=("$1"); shift; isOnlyPrintExtension=t;;
+	--accept-nonexisting)
+			anyBackupArgs+=("$1"); shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 3;;
 	*)		break;;
