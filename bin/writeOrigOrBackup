@@ -7,7 +7,7 @@ printShortUsage()
     printf 'Usage: %q %s\n' "$(basename "$1")" '[--delete-original] [--once-today] [--] FILE [...] [-?|-h|--help]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '[--delete-original] [--once-today] --ignore-no-files [--] [FILE [...]] [-?|-h|--help]'
     echo
-    printf 'Usage: sed -i"$(%q %s)" -e ... FILE\n' "$(basename "$1")" '[--once-today] --get-extension FILE'
+    printf 'Usage: sed -i"$(%q %s)" -e ... FILE\n' "$(basename "$1")" '[--once-today] --get-extension [--] FILE'
 }
 printUsage()
 {
