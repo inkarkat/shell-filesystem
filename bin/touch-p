@@ -1,5 +1,4 @@
 #!/bin/bash
-shopt -qs extglob
 
 printShortUsage()
 {
@@ -36,20 +35,20 @@ HELPTEXT
 
 sudoArg=
 isCreate=t
+isVerbose=
 typeset -a mkdirArgs=()
 typeset -a touchArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
-	-+([v]))	mkdirArgs+=("$1"); shift;;
-	--@(verbose))	mkdirArgs+=("$1"); shift;;
-	-[m])		mkdirArgs+=("$1" "$2"); shift; shift;;
-	--@(mode))	mkdirArgs+=("$1" "$2"); shift; shift;;
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--sudo)		shift; sudoArg=sudo;;
+
+	--verbose|-v)	mkdirArgs+=("$1"); shift; isVerbose=t;;
+	--mode|-m)	mkdirArgs+=("$1" "$2"); shift; shift;;
 
 	--no-create|-c)	touchArgs+=("$1"); shift; isCreate=;;
 
-	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
-	--sudo)		shift; sudoArg=sudo;;
 	--)		shift; break;;
 	*)		break;;
     esac
@@ -70,7 +69,11 @@ do
     else
 	dirspec="$(dirname -- "$filespec")"
 	[ -d "$dirspec" ] || $SUDO mkdir --parents "${mkdirArgs[@]}" -- "$dirspec" || { status=$?; continue; }
-	[ ! "$isCreate" ] || $SUDO touch "${touchArgs[@]}" -- "$filespec" || status=$?
+	if [ "$isCreate" ]; then
+	    $SUDO touch "${touchArgs[@]}" -- "$filespec" && \
+		if [ "$isVerbose" ]; then printf "touch: created file '%s'\\n" "$filespec"; fi || \
+		status=$?
+	fi
     fi
 done
 exit $status
