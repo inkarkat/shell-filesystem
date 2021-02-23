@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-c|--no-create] [-m|--mode MODE] [-v|--verbose] [--] FILE [...] [-?|-h|--help]'
+    printf 'Usage: [DEBUG=sudo[!]] %q %s\n' "$(basename "$1")" '[--sudo] [-c|--no-create] [-m|--mode MODE] [-v|--verbose] [--] FILE [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -26,12 +26,15 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
+    --sudo		Create with sudo unless already running as the
+			superuser.
     --no-create|-c	Do not create any files.
     --mode|-m MODE	Set file mode (as in chmod).
     --verbose|-v	Print a message for each created directory.
 HELPTEXT
 }
 
+sudoArg=
 isCreate=t
 typeset -a mkdirArgs=()
 typeset -a touchArgs=()
@@ -46,6 +49,7 @@ do
 	--no-create|-c)	touchArgs+=("$1"); shift; isCreate=;;
 
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--sudo)		shift; sudoArg=sudo;;
 	--)		shift; break;;
 	*)		break;;
     esac
@@ -55,15 +59,18 @@ if [ $# -eq 0 ]; then
     exit 2
 fi
 
+SUDO="$sudoArg"; [ $EUID -eq 0 ] && SUDO=''
+[ -n "$sudoArg" ] && case ",${DEBUG:-}," in *,sudo,*) SUDO="verbose $SUDO";; *,sudo\!,*) SUDO="echotrace $SUDO";; esac
+
 status=0
 for filespec
 do
     if [ -e "$filespec" ]; then
-	[ ! "$isCreate" ] || touch "${touchArgs[@]}" -- "$filespec" || status=$?
+	[ ! "$isCreate" ] || $SUDO touch "${touchArgs[@]}" -- "$filespec" || status=$?
     else
 	dirspec="$(dirname -- "$filespec")"
-	[ -d "$dirspec" ] || mkdir --parents "${mkdirArgs[@]}" -- "$dirspec" || { status=$?; continue; }
-	[ ! "$isCreate" ] || touch "${touchArgs[@]}" -- "$filespec" || status=$?
+	[ -d "$dirspec" ] || $SUDO mkdir --parents "${mkdirArgs[@]}" -- "$dirspec" || { status=$?; continue; }
+	[ ! "$isCreate" ] || $SUDO touch "${touchArgs[@]}" -- "$filespec" || status=$?
     fi
 done
 exit $status
