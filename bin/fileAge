@@ -1,4 +1,5 @@
 #!/bin/bash
+shopt -qs extglob
 
 printUsage()
 {
@@ -6,21 +7,56 @@ printUsage()
 Show the age (in seconds since the Epoch, or seconds with -d|--diff) of all passed FILE(s).
 HELPTEXT
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-d|--diff] [--] FILE [...] [-?|-h|--help]'
+    echo
+    cat <<HELPTEXT
+Test whether the age of FILE is greater / smaller than AGE.
+SUFFIX may be 's' for seconds (the default), 'm' for minutes, 'h' for hours, 'd'
+for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
+HELPTEXT
+    printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--newer AGE[SUFFIX]|-o|--older AGE[SUFFIX] [--] FILE'
 }
 
+timeToSeconds()
+{
+    case "$1" in
+	+([0-9])?(s))   age="${1%s}";;
+	+([0-9])m)	age=$((${1%m} * 60));;
+	+([0-9])h)	age=$((${1%h} * 3600));;
+	+([0-9])d)	age=$((${1%d} * 86400));;
+	+([0-9])w)	age=$((${1%w} * 86400 * 7));;
+	+([0-9])mo)	age=$((${1%mo} * 86400 * 30));;
+	+([0-9])y)	age=$((${1%y} * 86400 * 365));;
+	+([0-9])g)	age=$((${1%g} * 86400 * 9131));;
+	*)		printf >&2 'ERROR: Illegal age: %s\n' "$1"; exit 2;;
+    esac
+    printf %s "$age"
+}
+
+compareOp=
 isDiff=
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
 	--diff|-d)	shift; isDiff=t;;
+	--newer|-n)	shift; age="$(timeToSeconds "$1")" || exit $?; shift; compareOp=-lt;;
+	--older|-o)	shift; age="$(timeToSeconds "$1")" || exit $?; shift; compareOp=-gt;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
     esac
 done
 
-if [ "$isDiff" ]; then
+if [ -n "$compareOp" ]; then
+    if [ $# -ne 1 ]; then
+	printUsage "$0" >&2
+	exit 2
+    fi
+    now="$(date +%s)"
+    epoch=$(stat -L --format %Y -- "$@")
+
+    [ $((now - epoch)) $compareOp $age ]
+elif [ "$isDiff" ]; then
     now="$(date +%s)"
     while read -r epoch
     do
