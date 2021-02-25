@@ -41,6 +41,11 @@ HELPDESCRIPTION
                                 current day was already made.
     --get-extension		Just print the backup extension (or nothing if
 				--once-today and a backup already exists).
+    --accept-nonexisting	Do not print an error if FILE does not exist,
+				but simply print the would-be backup extension.
+				Useful for direct-backup use cases where there's
+				either no original file or it is located
+				somewhere else.
 EXIT STATUS:
     0	Complete success.
     1	Failed to backup any file(s).
