@@ -102,7 +102,7 @@ isFailure=
 
 for filespec
 do
-    if writeorig --keep "${anyBackupArgs[@]}" -- "$filespec" || writebackup "${anyBackupArgs[@]}" "${writebackupArgs[@]}" -- "$filespec"; then
+    if writeorig "${anyBackupArgs[@]}" -- "$filespec" || writebackup "${anyBackupArgs[@]}" "${writebackupArgs[@]}" -- "$filespec"; then
 	isSuccess=t
     else
 	isFailure=t

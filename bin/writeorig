@@ -29,7 +29,7 @@ HELPDESCRIPTION
     cat <<HELPTEXT
     --overwrite|-f		Overwrite an existing backup.
     --keep|-k			Do nothing if the backup already exists
-				(default behavior).
+				(default behavior), and succeed instead.
     --delete-original		Removes the original FILE after creating
 				FILE.orig; you can use this for a final backup
 				before getting rid of the FILE.
@@ -49,7 +49,7 @@ HELPDESCRIPTION
 				with sed -i\$backupExtension) or react on the
 				exit status 1.
 EXIT STATUS:
-    0	Complete success.
+    0	Complete success, or backup already exists and -k|--keep is given.
     1	Failed to backup any file(s).
     2	Partial success; some file(s) could not be backed up.
     3	Bad invocation, wrong or missing command-line arguments.
@@ -57,6 +57,7 @@ HELPTEXT
 }
 
 isOverwrite=
+backupExistsStatus=1
 isIgnoreNoFiles=
 isDeleteOriginal=
 isOnlyPrintExtension=
@@ -66,7 +67,7 @@ do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--overwrite|-f)	shift; isOverwrite=t;;
-	--keep|-k)	shift; isOverwrite=;;
+	--keep|-k)	shift; isOverwrite=; backupExistsStatus=0;;
 	--ignore-no-files)
 			shift; isIgnoreNoFiles=t;;
 	--delete-original)
@@ -109,7 +110,7 @@ writebackup()
 	local -r backupFilespec="${filespec}.orig"
 	if [ "${backupFilespec}" ]; then
 	    if [ ! "$isOverwrite" ] && [ -e "$backupFilespec" ]; then
-		return 1
+		return $backupExistsStatus
 	    fi
 	    if [ "$isOnlyPrintExtension" ]; then
 		printf '%s\n' ".${backupFilespec##*.}"
