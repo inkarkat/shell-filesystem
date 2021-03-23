@@ -47,7 +47,7 @@ do
 done
 
 #mount "$@" | sed -e '/ on \/\(dev\|proc\|run\|snap\|sys\)[ /]/d' -e '/^veracrypt /d' -e 's/ \(on\|type\) / /g' | sort -k 2,2 | column -t
-findmnt --list --real --output target,source,fstype,size,use%,options "${findmntArgs[@]}" | \
+findmnt --list --output target,source,fstype,size,use%,options "${findmntArgs[@]}" | \
     {
 	read -r header; printf '%s\n' "$header"
 	sed -e '/^\/\(dev\|proc\|run\|snap\|sys\)[ /]/d' -e '/[[:space:]]veracrypt[[:space:]]/d' "${additionalSedArgs[@]}" | \
