@@ -62,14 +62,13 @@ isIgnoreNoFiles=
 isDeleteOriginal=
 isOnlyPrintExtension=
 typeset -a anyBackupArgs=()
-typeset -a writebackupArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--delete-original)
 			anyBackupArgs+=("$1"); shift; isDeleteOriginal=t;;
-	--once-today)	writebackupArgs+=("$1"); shift;;
+	--once-today)	anyBackupArgs+=("$1"); shift;;
 	--ignore-no-files)
 			shift; isIgnoreNoFiles=t;;
 	--get-extension)
