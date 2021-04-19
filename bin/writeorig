@@ -4,10 +4,10 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--delete-original] [--] FILE|DIR [...] [-?|-h|--help]'
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] [--delete-original] --ignore-no-files [--] [FILE|DIR [...]] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] [--delete-original] [--] FILE|DIR [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] [--delete-original] --ignore-no-files [--] [FILE|DIR [...]] [-?|-h|--help]'
     echo
-    printf 'Usage: sed -i"$(%q %s)" -e ... FILE|DIR\n' "$(basename "$1")" '[-f|--overwrite|-k|--keep] --get-extension [--accept-nonexisting] [--] FILE|DIR'
+    printf 'Usage: sed -i"$(%q %s)" -e ... FILE|DIR\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] --get-extension [--accept-nonexisting] [--] FILE|DIR'
 }
 printUsage()
 {
@@ -28,6 +28,9 @@ HELPDESCRIPTION
     echo
     cat <<HELPTEXT
     --overwrite|-f		Overwrite an existing backup.
+    --once-today		Overwrite an existing backup if that backup was
+				made on an earlier day, but not when it was made
+				today.
     --keep|-k			Do nothing if the backup already exists
 				(default behavior), and succeed instead.
     --delete-original		Removes the original FILE after creating
@@ -49,7 +52,8 @@ HELPDESCRIPTION
 				with sed -i\$backupExtension) or react on the
 				exit status 1.
 EXIT STATUS:
-    0	Complete success, or backup already exists and -k|--keep is given.
+    0	Complete success, or backup already exists and -k|--keep is given, or
+	the backup is from today and --once-today is given.
     1	Failed to backup any file(s).
     2	Partial success; some file(s) could not be backed up.
     3	Bad invocation, wrong or missing command-line arguments.
@@ -57,6 +61,7 @@ HELPTEXT
 }
 
 isOverwrite=
+isOnceToday=
 backupExistsStatus=1
 isIgnoreNoFiles=
 isDeleteOriginal=
@@ -67,6 +72,7 @@ do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--overwrite|-f)	shift; isOverwrite=t;;
+	--once-today)	shift; isOnceToday=t;;
 	--keep|-k)	shift; isOverwrite=; backupExistsStatus=0;;
 	--ignore-no-files)
 			shift; isIgnoreNoFiles=t;;
@@ -109,8 +115,14 @@ writebackup()
 	fi
 	local -r backupFilespec="${filespec}.orig"
 	if [ "${backupFilespec}" ]; then
-	    if [ ! "$isOverwrite" ] && [ -e "$backupFilespec" ]; then
-		return $backupExistsStatus
+	    if [ -e "$backupFilespec" ]; then
+		if [ "$isOverwrite" ]; then
+		    :
+		elif [ "$isOnceToday" ]; then
+		    fileAge --newer 1d -- "$backupFilespec" && return 0
+		else
+		    return $backupExistsStatus
+		fi
 	    fi
 	    if [ "$isOnlyPrintExtension" ]; then
 		printf '%s\n' ".${backupFilespec##*.}"
