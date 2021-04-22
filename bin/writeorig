@@ -133,45 +133,41 @@ writebackup()
 	else
 	    local -r backupFilespec="${filespec}.orig"
 	fi
-	if [ -n "${backupFilespec}" ]; then
-	    if [ -e "$backupFilespec" ]; then
-		if [ "$isOverwrite" ]; then
-		    :
-		elif [ "$isOnceToday" ]; then
-		    fileAge --newer 1d -- "$backupFilespec" && return 0
-		else
-		    return $backupExistsStatus
-		fi
-	    fi
-	    if [ "$isOnlyPrintExtension" ]; then
-		printf '%s\n' ".${backupFilespec##*.}"
-		return 0
-	    fi
-
-	    if [ -f "$filespec" ]; then
-		umask 0111	# Drop the execute permission on the backup.
-		cp -- "${filespec}" "${backupFilespec}" || return 1
-		printf 'Backed up to %s%s\n' "$backupDir" "$(basename -- "${backupFilespec}")"
-
-		if [ "$isDeleteOriginal" ]; then
-		    rm --force -- "${filespec}" || return 1
-		    printf 'Deleted original %s\n' "$filespec"
-		fi
-
-		return 0
-	    elif [ -d "$filespec" ]; then
-		if [ "$isDeleteOriginal" ]; then
-		    mv --force -- "${filespec}" "${backupFilespec}" || return 1
-		    printf 'Moved original directory to %s%s\n' "$backupDir" "$(basename -- "${backupFilespec}")"
-		else
-		    cp --archive --no-target-directory --force -- "${filespec}" "${backupFilespec}" || return 1
-		    printf 'Copied directory to %s%s\n' "$backupDir" "$(basename -- "${backupFilespec}")"
-		fi
+	if [ -e "$backupFilespec" ]; then
+	    if [ "$isOverwrite" ]; then
+		:
+	    elif [ "$isOnceToday" ]; then
+		fileAge --newer 1d -- "$backupFilespec" && return 0
 	    else
-		# Ignore anything else?!
-		return 1
+		return $backupExistsStatus
+	    fi
+	fi
+	if [ "$isOnlyPrintExtension" ]; then
+	    printf '%s\n' ".${backupFilespec##*.}"
+	    return 0
+	fi
+
+	if [ -f "$filespec" ]; then
+	    umask 0111	# Drop the execute permission on the backup.
+	    cp -- "${filespec}" "${backupFilespec}" || return 1
+	    printf 'Backed up to %s%s\n' "$backupDir" "$(basename -- "${backupFilespec}")"
+
+	    if [ "$isDeleteOriginal" ]; then
+		rm --force -- "${filespec}" || return 1
+		printf 'Deleted original %s\n' "$filespec"
+	    fi
+
+	    return 0
+	elif [ -d "$filespec" ]; then
+	    if [ "$isDeleteOriginal" ]; then
+		mv --force -- "${filespec}" "${backupFilespec}" || return 1
+		printf 'Moved original directory to %s%s\n' "$backupDir" "$(basename -- "${backupFilespec}")"
+	    else
+		cp --archive --no-target-directory --force -- "${filespec}" "${backupFilespec}" || return 1
+		printf 'Copied directory to %s%s\n' "$backupDir" "$(basename -- "${backupFilespec}")"
 	    fi
 	else
+	    # Ignore anything else?!
 	    return 1
 	fi
     elif [ "$isOnlyPrintExtension" ] && [ "$isAcceptNonexisting" ]; then
