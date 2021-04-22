@@ -112,7 +112,7 @@ elif [ "$isOnlyPrintExtension" ] && [ "$isDeleteOriginal" ]; then
     echo
     printUsage "$0"
     exit 2
-elif [ "$backupDir" -a ! -d "${backupDir%/}" ]; then
+elif [ -n "$backupDir" -a ! -d "${backupDir%/}" ]; then
     printf 'ERROR: Backup dir does not exist: "%s"!\n' "${backupDir%/}"
     exit 3
 fi >&2

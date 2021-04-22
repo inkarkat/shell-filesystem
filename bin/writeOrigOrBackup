@@ -4,8 +4,8 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[--delete-original] [--once-today] [--backup-dir|-d] [--] FILE [...] [-?|-h|--help]'
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[--delete-original] [--once-today] [--backup-dir|-d] --ignore-no-files [--] [FILE [...]] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--backup-dir|-d DIR] [--delete-original] [--once-today] [--] FILE [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--backup-dir|-d DIR] [--delete-original] [--once-today] --ignore-no-files [--] [FILE [...]] [-?|-h|--help]'
     echo
     printf 'Usage: sed -i"$(%q %s)" -e ... FILE\n' "$(basename "$1")" '--get-extension [--once-today] [--accept-nonexisting] [--] FILE'
 }
@@ -30,6 +30,8 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
+    --backup-dir|-d DIR		Create backups in DIR instead of in the same
+				directory as the original file.
     --delete-original		Removes the original FILE after creating
 				FILE.orig; you can use this for a final backup
 				before getting rid of the FILE.
@@ -66,6 +68,8 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--backup-dir|-d)
+			anyBackupArgs+=("$1" "$2"); shift; shift;;
 	--delete-original)
 			anyBackupArgs+=("$1"); shift; isDeleteOriginal=t;;
 	--once-today)	anyBackupArgs+=("$1"); shift;;
