@@ -4,8 +4,8 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] [--delete-original] [--] FILE|DIR [...] [-?|-h|--help]'
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] [--delete-original] --ignore-no-files [--] [FILE|DIR [...]] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] [--backup-dir|-d DIR] [--delete-original] [--] FILE|DIR [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] [--backup-dir|-d DIR] [--delete-original] --ignore-no-files [--] [FILE|DIR [...]] [-?|-h|--help]'
     echo
     printf 'Usage: sed -i"$(%q %s)" -e ... FILE|DIR\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] --get-extension [--accept-nonexisting] [--] FILE|DIR'
 }
@@ -33,6 +33,8 @@ HELPDESCRIPTION
 				today.
     --keep|-k			Do nothing if the backup already exists
 				(default behavior), and succeed instead.
+    --backup-dir|-d DIR		Create backups in DIR instead of in the same
+				directory as the original file.
     --delete-original		Removes the original FILE after creating
 				FILE.orig; you can use this for a final backup
 				before getting rid of the FILE.
@@ -63,6 +65,7 @@ HELPTEXT
 isOverwrite=
 isOnceToday=
 backupExistsStatus=1
+backupDir=
 isIgnoreNoFiles=
 isDeleteOriginal=
 isOnlyPrintExtension=
@@ -74,6 +77,15 @@ do
 	--overwrite|-f)	shift; isOverwrite=t;;
 	--once-today)	shift; isOnceToday=t;;
 	--keep|-k)	shift; isOverwrite=; backupExistsStatus=0;;
+	--backup-dir|-d)
+			if [ -z "$2" ]; then
+			    { echo "ERROR: Must pass directory after ${1}!"; echo; printUsage "$0"; } >&2
+			    exit 3
+			fi
+			shift
+			backupDir="${1%/}/"
+			shift
+			;;
 	--ignore-no-files)
 			shift; isIgnoreNoFiles=t;;
 	--delete-original)
@@ -100,6 +112,9 @@ elif [ "$isOnlyPrintExtension" ] && [ "$isDeleteOriginal" ]; then
     echo
     printUsage "$0"
     exit 2
+elif [ "$backupDir" -a ! -d "${backupDir%/}" ]; then
+    printf 'ERROR: Backup dir does not exist: "%s"!\n' "${backupDir%/}"
+    exit 3
 fi >&2
 
 writebackup()
@@ -113,8 +128,12 @@ writebackup()
 	    printf >&2 'ERROR: "%s" is not readable!\n' "$filespec"
 	    return 1
 	fi
-	local -r backupFilespec="${filespec}.orig"
-	if [ "${backupFilespec}" ]; then
+	if [ -n "$backupDir" ]; then
+	    local -r backupFilespec="${backupDir}$(basename -- "${filespec}").orig"
+	else
+	    local -r backupFilespec="${filespec}.orig"
+	fi
+	if [ -n "${backupFilespec}" ]; then
 	    if [ -e "$backupFilespec" ]; then
 		if [ "$isOverwrite" ]; then
 		    :
