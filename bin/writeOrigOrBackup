@@ -4,10 +4,10 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[--delete-original] [--once-today] [--] FILE [...] [-?|-h|--help]'
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[--delete-original] [--once-today] --ignore-no-files [--] [FILE [...]] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--delete-original] [--once-today] [--backup-dir|-d] [--] FILE [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--delete-original] [--once-today] [--backup-dir|-d] --ignore-no-files [--] [FILE [...]] [-?|-h|--help]'
     echo
-    printf 'Usage: sed -i"$(%q %s)" -e ... FILE\n' "$(basename "$1")" '[--once-today] --get-extension [--accept-nonexisting] [--] FILE'
+    printf 'Usage: sed -i"$(%q %s)" -e ... FILE\n' "$(basename "$1")" '--get-extension [--once-today] [--accept-nonexisting] [--] FILE'
 }
 printUsage()
 {
