@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-t|--types LIST] [-u|--user|-U|--no-user] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-t|--types LIST] [-u|--user|-U|--no-user] [-k|--kubernetes|-K|--no-kubernetes] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -30,6 +30,8 @@ HELPDESCRIPTION
 			the filesystem types on which no action should be taken.
     --[no-]user|-u|-U	Only / do not list mounts for the current user in
 			/media/<USER>/.
+    --[no-]kubernetes|-k|-K
+			Only / do not list mounts of Kubernetes kubelets.
 HELPTEXT
 }
 
@@ -42,6 +44,10 @@ do
 	--types|-t)	findmntArgs+=("$1" "$2"); shift; shift;;
 	--user|-u)	shift; additionalSedArgs+=(-e "/^\/media\/${USER}\//!d");;
 	--no-user|-U)	shift; additionalSedArgs+=(-e "/^\/media\/${USER}\//d");;
+	--kubernetes|-k)
+			shift; additionalSedArgs+=(-e "/\/data\/kubelet\/pods\//!d");;
+	--no-kubernetes|-K)
+			shift; additionalSedArgs+=(-e "/\/data\/kubelet\/pods\//d");;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
