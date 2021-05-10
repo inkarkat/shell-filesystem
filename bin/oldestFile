@@ -1,0 +1,79 @@
+#!/bin/bash
+set -o pipefail
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--epoch-only|-n|--name-only] [--] [DIRSPEC [...]] [FIND-ARGS ...] [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Print the file modification date, tab, and file name of the oldest created /
+modified file in the current directory tree / DIRSPEC [matching FIND-ARGS].
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --epoch-only|-e	Omit the filename; just print the file modification date
+			(seconds since 1970).
+    --name-only|-n	Omit the file modification date, just print the file
+			path (as returned by find).
+EXIT STATUS:
+    0	Complete success.
+    1	No files found.
+    2	Bad invocation, wrong or missing command-line arguments.
+HELPTEXT
+}
+
+outputFormat='fileAge "\t" filespec'
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--epoch-only|-e)
+			shift; outputFormat='fileAge';;
+	--name-only|-n)	shift; outputFormat='filespec';;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+
+[ $# -eq 0 ] && set -- .
+
+find "$@" -type f -printf "%T@\0%p\0" | awk \
+'
+BEGIN {
+    RS="\0"
+    fileAge = 2^PREC
+}
+{
+    if ($0 < fileAge) {
+	fileAge = $0;
+	getline filespec
+    } else {
+	getline
+    }
+}
+'"
+END {
+    if (fileAge < 2^PREC) {
+	fileAge = int(fileAge)
+	print $outputFormat
+    } else {
+	exit(1)
+    }
+}
+"
