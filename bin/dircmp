@@ -17,20 +17,22 @@ if [ $# -ne 2 ]; then
     exit 2
 fi
 
-typeset exitStatus=0
+status=0
 readonly dir2="${2:?}"
-readonly absDir2=$(readlink -nf -- "${dir2}")
+readonly absDir2="$(readlink -nf -- "${dir2}")"
+
 pushd "${1:?}" >/dev/null || exit $?
 trap 'popd >/dev/null' EXIT
 
-find . -type f -print | { while IFS=$'\n' read -r filespec
+while IFS=$'\n' read -r filespec
 do
     typeset filespec2="${absDir2}/${filespec#./}"
     if [ ! -e "${filespec2}" ]; then
 	printf 'MISS %s\n' "${dir2%/}/${filespec#./}"
-	exitStatus=1
+	status=1
     elif ! cmp --quiet "$filespec" "$filespec2"; then
 	printf 'DIFF %s\n' "$filespec"
-	exitStatus=1
+	status=1
     fi
-done; exit $exitStatus; }
+done < <(find . -type f -print)
+exit $status
