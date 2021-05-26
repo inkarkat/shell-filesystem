@@ -1,12 +1,28 @@
 #!/bin/bash
 
-# dircmp		Recursively compare all files in dir1 with dir2. Print
-#			differing files and files missing in dir2.
+printUsage()
+{
+    cat <<HELPTEXT
+Recursively compare all files in DIR1 with DIR2. Print differing files and files
+missing in DIR2.
+HELPTEXT
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" 'DIR1 DIR2 [-?|-h|--help]'
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+esac
+if [ $# -ne 2 ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
+
 typeset exitStatus=0
-readonly dir2=${2:?}
+readonly dir2="${2:?}"
 readonly absDir2=$(readlink -nf -- "${dir2}")
-pushd "$1" >/dev/null || exit $?
+pushd "${1:?}" >/dev/null || exit $?
 trap 'popd >/dev/null' EXIT
+
 find . -type f -print | { while IFS=$'\n' read -r filespec
 do
     typeset filespec2="${absDir2}/${filespec#./}"
