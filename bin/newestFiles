@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-t|--newer-than EPOCH|-N|--newer FILE|'GLOB' [...]|-c|--count N] [-e|--include-epoch] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-t|--newer-than EPOCH|-N|--newer FILE|'FILE-GLOB' [...]|-c|--count N] [-e|--include-epoch] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -28,10 +28,11 @@ HELPDESCRIPTION
     cat <<HELPTEXT
     --newer-than|-t EPOCH   Print all files that have been modified after EPOCH
 			    (seconds since 1970).
-    --newer|-N FILE|'GLOB'  Print all files that have been modified after FILE
-			    / the newest file matching GLOB (if the directory
-			    has such a file). Output order is globally sorted by
-			    modification date, ascending.
+    --newer|-N FILE|'FILE-GLOB'
+			    Print all files that have been modified after FILE
+			    / the newest file matching FILE-GLOB (if the
+			    directory has such a file). Output order is globally
+			    sorted by modification date, ascending.
     --count|-c N	    Print the last N modified files (or fewer if not
 			    available) instead of just the last one / all newer.
     --include-epoch|-e	    Put the file modification date (seconds since 1970)
@@ -40,7 +41,7 @@ EXIT STATUS:
     0	Complete success.
     1	No files found.
     2	Bad invocation, wrong or missing command-line arguments.
-    4	FILE does not exist / 'GLOB' did not yield any files.
+    4	FILE does not exist / 'FILE-GLOB' did not yield any files.
 HELPTEXT
 }
 

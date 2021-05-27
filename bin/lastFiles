@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-a|--after FILE|'GLOB' [...] [-C|--count-if-sentinel-missing N] | -c|--count N] [--] [DIRSPEC [...]] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-a|--after FILE|'FILE-GLOB' [...] [-C|--count-if-sentinel-missing N] | -c|--count N] [--] [DIRSPEC [...]] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -27,19 +27,21 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     cat <<HELPTEXT
-    --after|-a FILE|'GLOB'  Print all files that alphabetically come after FILE
+    --after|-a FILE|'FILE-GLOB'
+			    Print all files that alphabetically come after FILE
 			    (ignoring any path components) / the last file
-			    matching GLOB (if the directory has such a file).
+			    matching FILE-GLOB (if the directory has such a
+			    file).
     --count-if-sentinel-missing|-C N
 			    Print the last N files (or fewer if not available)
-			    if no sentinel FILE|'GLOB' exists.
+			    if no sentinel FILE|'FILE-GLOB' exists.
     --count|-c N	    Print the last N files (or fewer if not available)
 			    instead of just the last one.
 EXIT STATUS:
     0	Complete success.
     1	No files found.
     2	Bad invocation, wrong or missing command-line arguments.
-    4	No sentinel FILE|'GLOB' exists (so files cannot be searched) (and
+    4	No sentinel FILE|'FILE-GLOB' exists (so files cannot be searched) (and
 	--count-if-sentinel-missing has not been passed).
 HELPTEXT
 }

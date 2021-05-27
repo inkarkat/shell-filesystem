@@ -4,11 +4,11 @@ shopt -qs extglob nullglob dotglob
 printUsage()
 {
     cat <<HELPTEXT
-Print a list of FILE(s) that exist and files matching GLOB(s). If an argument
-both represents an existing file and also matches as a glob, both literal file
-and glob results are returned.
+Print a list of FILE(s) that exist and files matching FILE-GLOB(s). If an
+argument both represents an existing file and also matches as a glob, both
+literal file and glob results are returned.
 HELPTEXT
-printf 'Usage: %q %s\n' "$(basename "$1")" "[--] FILE|'GLOB' [...] [-?|-h|--help]"
+printf 'Usage: %q %s\n' "$(basename "$1")" "[--] FILE|'FILE-GLOB' [...] [-?|-h|--help]"
 }
 case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
@@ -24,8 +24,8 @@ for arg
 do
     [ -e "$arg" ] && result+=("$arg")
 
-    # Still need to check for existing files; in case a GLOB without a wildcard
-    # was passed, it's not eliminated by nullglob.
+    # Still need to check for existing files; in case a FILE-GLOB without a
+    # wildcard was passed, it's not eliminated by nullglob.
     eval "typeset -a files=($arg)"
     for f in "${files[@]}"
     do

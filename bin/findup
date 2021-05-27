@@ -15,7 +15,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[STARTING-POINT [...]] [-1|--stop-at-first] [--stop-at DIR [...]] [--not-above DIR [...]] [--stopdepth LEVELS] [--mindepth LEVELS] [--maxdepth LEVELS] [--print|--exec COMMAND [...] ;|--execdir COMMAND [...] ;] [--] FILE|'GLOB' [...] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[STARTING-POINT [...]] [-1|--stop-at-first] [--stop-at DIR [...]] [--not-above DIR [...]] [--stopdepth LEVELS] [--mindepth LEVELS] [--maxdepth LEVELS] [--print|--exec COMMAND [...] ;|--execdir COMMAND [...] ;] [--] FILE|'FILE-GLOB' [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -29,7 +29,7 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Locate a FILE or matches for GLOB in parent directories (from the current
+Locate a FILE or matches for FILE-GLOB in parent directories (from the current
 directory or passed STARTING-POINT(s), up to the root directory), and print its
 / their full path(s). Each STARTING-POINT must be an existing directory or at
 least have an existing (grand-...)parent directory.
@@ -66,7 +66,7 @@ fileGlobFollowedByOptionCheck()
 	    fileGlobsPlural=
 	    fileGlobsVerb=is
 	fi
-	printf >&2 "ERROR: %s %s not a valid STARTING-POINT%s and to be treated as FILE|'GLOB' must be placed after %s.\\n" "${fileGlobs[*]}" "$fileGlobsVerb" "$fileGlobsPlural" "$1"
+	printf >&2 "ERROR: %s %s not a valid STARTING-POINT%s and to be treated as FILE|'FILE-GLOB' must be placed after %s.\\n" "${fileGlobs[*]}" "$fileGlobsVerb" "$fileGlobsPlural" "$1"
 	exit 2
     fi
 }
