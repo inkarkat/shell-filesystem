@@ -42,4 +42,5 @@ do
 	common_path="$new_common_path"
     done
 done
+[ -z "$common_path" ] && exit 1
 printf '%s\n' "$common_path"
