@@ -1,0 +1,34 @@
+#!/bin/bash
+shopt -qs extglob
+
+printUsage()
+{
+    cat <<HELPTEXT
+chmod +x; make passed files executable. When passed a directory, all files
+without file extensions will be made executable.
+HELPTEXT
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--] FILESPEC [...] [-?|-h|--help]'
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+    --)			shift;;
+esac
+if [ $# -eq 0 ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
+
+status=0
+for filespec
+do
+    if [ -d "$filespec" ]; then
+	ls "$filespec"/+([^.])
+	typeset answer
+	read -p 'Make all files executable (y/n) ' answer
+	[ "$answer" = 'y' ] && chmod +x -- "$filespec"/+([^.])
+    else
+	chmod +x -- "$filespec" || status=$?
+    fi
+done
+exit $status
