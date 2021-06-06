@@ -16,7 +16,19 @@
 # @(#)commonpath	001	(14-Jun-2013)	tools
 ###############################################################################
 
+printUsage()
+{
+    cat <<HELPTEXT
+Print the directory that is common to all passed FILESPECs.
+HELPTEXT
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" 'FILESPEC [...] [-?|-h|--help]'
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+esac
 if [ $# -eq 0 ]; then
+    printUsage >&2 "$0"
     exit 2
 elif [ $# -eq 1 ]; then
     printf '%s\n' "${1%/*}"
@@ -26,7 +38,7 @@ fi
 # Remove repeated slashes.
 for param
 do
-    param="$(printf %s. "$1" | tr -s "/")"
+    param="$(printf %s. "$1" | tr -s /)"
     set -- "$@" "${param%.}"
     shift
 done
