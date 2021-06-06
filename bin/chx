@@ -24,9 +24,8 @@ for filespec
 do
     if [ -d "$filespec" ]; then
 	ls "$filespec"/+([^.])
-	typeset answer
-	read -p 'Make all files executable (y/n) ' answer
-	[ "$answer" = 'y' ] && chmod +x -- "$filespec"/+([^.])
+	offerTo --clear-prompt 'Make all files executable?' && \
+	    chmod +x -- "$filespec"/+([^.])
     else
 	chmod +x -- "$filespec" || status=$?
     fi
