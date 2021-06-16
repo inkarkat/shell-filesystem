@@ -75,7 +75,7 @@ done
 IFS=$'\n'
 fileAge()
 {
-    stat -L --format %Y "$@" 2>/dev/null || echo -1
+    stat --dereference --format %Y "$@" 2>/dev/null || echo -1
 }
 if [ ${#globs[@]} -gt 0 ]; then
     if [ -n "$sentinelAge" ]; then

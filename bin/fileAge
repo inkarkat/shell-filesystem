@@ -53,7 +53,7 @@ if [ -n "$compareOp" ]; then
 	exit 2
     fi
     now="$(date +%s)"
-    epoch=$(stat -L --format %Y -- "$@")
+    epoch=$(stat --dereference --format %Y -- "$@")
 
     [ $((now - epoch)) $compareOp $age ]
 elif [ "$isDiff" ]; then
@@ -61,7 +61,7 @@ elif [ "$isDiff" ]; then
     while read -r epoch
     do
 	printf '%d\n' "$((now - epoch))"
-    done < <(stat -L --format %Y -- "$@")
+    done < <(stat --dereference --format %Y -- "$@")
 else
-    exec stat -L --format %Y -- "$@"
+    exec stat --dereference --format %Y -- "$@"
 fi
