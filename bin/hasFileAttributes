@@ -1,0 +1,98 @@
+#!/bin/bash
+shopt -qs extglob
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-o|--owner OWNER] [-g|--group GROUP] [-m|--mode MODE] [-L|--dereference] [--] FILE [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Check whether FILE has OWNER / GROUP / MODE.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --owner|-o OWNER	Check ownership. OWNER may be either a user name or a
+			numeric user ID.
+    --group|-g GROUP	Check group ownership. GROUP may be either a group name
+			or a numeric group ID.
+    --mode|-m MODE	Check permission mode; MODE can be either an octal
+			number, or a symbolic mode as in 'chmod', with 'a=' (no
+			access allowed to anyone) as the point of departure.
+    --dereference|-L	Follow links.
+
+EXIT STATUS:
+    0	FILE already has the supplied attributes.
+    1	FILE's attributes differ.
+    2	Bad invocation, wrong or missing command-line arguments.
+    4	FILE does not exist.
+HELPTEXT
+}
+
+owner=
+group=
+mode=
+typeset -a statArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+
+	--owner|-o)	installArgs+=("$1" "$2"); owner="$2"; shift; shift;;
+	--owner=*)	installArgs+=("$1"); owner="${1#--owner=}"; shift;;
+	--group|-g)	installArgs+=("$1" "$2"); group="$2"; shift; shift;;
+	--group=*)	installArgs+=("$1"); group="${1#--group=}"; shift;;
+	--mode|-m)	installArgs+=("$1" "$2"); mode="$2"; shift; shift;;
+	--mode=*)	installArgs+=("$1"); mode="${1#--mode=}"; shift;;
+
+	--dereference|-L)
+			statArgs+=("$1"); shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -ne 1 ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
+
+filespec="${1:?}"; shift
+if [ ! -e "$filespec" ]; then
+    printf >&2 'ERROR: FILE does not exist: %s\n' "$(realpath --no-symlinks -- "$filespec")"
+    exit 3
+fi
+
+getMode()
+{
+    stat "${statArgs[@]}" --format '%f' -- "${1:?}"
+}
+checkMode()
+{
+    # Due to the various formats of the passed mode, let's do the comparison by
+    # creating a temp file and comparing its mode.
+    local TMPFILE="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${TEMP:-/tmp}/$(basename -- "$0").$$$RANDOM")"
+    install --no-target-directory --mode "$mode" -- /dev/null "$TMPFILE" 2>/dev/null || return 1
+    local desiredMode="$(getMode "$TMPFILE")"
+    local actualMode="$(getMode "$filespec")"
+    rm --force -- "$TMPFILE" 2>/dev/null
+    [ "$desiredMode" = "$actualMode" ]
+}
+
+[ -z "$owner" ] || stat --format $'%u\n%U' -- "$filespec" | grep --quiet --fixed-strings --line-regexp -e "$owner" || exit 1
+[ -z "$group" ] || stat --format $'%g\n%G' -- "$filespec" | grep --quiet --fixed-strings --line-regexp -e "$group" || exit 1
+[ -z "$mode" ] || checkMode || exit 1
+exit 0
