@@ -7,11 +7,19 @@ Tests whether all of the passed FILEs resides on the same file system.
 Returns 1 if at least one FILE is on a different file system (or cannot be
 accessed).
 HELPTEXT
-    printf 'Usage: %q %s\n' "$(basename "$1")" 'FILE1 FILE2 [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-L|--dereference] [--] FILE1 FILE2 [...] [-?|-h|--help]'
 }
-case "$1" in
-    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-esac
+typeset -a statArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	    shift; printUsage "$0"; exit 0;;
+	--dereference|-L)   statArgs+=("$1"); shift;;
+	--)		    shift; break;;
+	-*)		    { echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		    break;;
+    esac
+done
 if [ $# -lt 2 ]; then
     printUsage "$0" >&2
     exit 2
@@ -19,7 +27,7 @@ fi
 
 getFileSystemId()
 {
-    stat --format %d -- "${1:?}"
+    stat "${statArgs[@]}" --format %d -- "${1:?}"
 }
 
 fsId="$(getFileSystemId "$1")"; shift
