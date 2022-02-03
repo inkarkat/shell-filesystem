@@ -4,7 +4,8 @@ shopt -qs extglob
 printUsage()
 {
     cat <<HELPTEXT
-Show the age (in seconds since the Epoch, or seconds with -d|--diff) of all passed FILE(s).
+Show the age (time of last data modification) in seconds since the Epoch (or
+seconds passed with -d|--diff) of all passed FILE(s).
 HELPTEXT
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-d|--diff] [--] FILE [...] [-?|-h|--help]'
     echo
