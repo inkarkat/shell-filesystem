@@ -18,6 +18,14 @@ for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
 HELPTEXT
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--newer|-o|--older|-lt|-le|-eq|-ne|-ge|-gt AGE[SUFFIX] [--] FILE [...]'
+    echo
+    cat <<HELPTEXT
+EXIT STATUS:
+    0	Complete success.
+    1	The comparison failed; at least one FILE did not pass it.
+    2	Bad invocation, wrong or missing command-line arguments.
+    4	Some of the passed FILE(s) do not exist.
+HELPTEXT
 }
 
 timeToSeconds()
@@ -60,21 +68,26 @@ fi
 
 getEpoch()
 {
-    stat --dereference --format %Y -- "$@"
+    stat --dereference --format %Y -- "$@" || return 4
 }
 
 if [ -n "$compareOp" ]; then
     now="$(date +%s)"
-    while read -r epoch
+    exitStatus=3
+    compareStatus=0
+    while IFS=$'\n' read -r epoch || { exitStatus="$epoch"; break; }	# Exit status from the process substitution (<(getEpoch)) is lost; return the actual exit status via an incomplete (i.e. missing the newline) last line.
     do
-	[ $((now - epoch)) $compareOp $age ] || exit 1
-    done < <(getEpoch "$@")
+	[ $((now - epoch)) $compareOp $age ] || compareStatus=1
+    done < <(getEpoch "$@"; printf %d "$?")
+    exit $((exitStatus > 0 ? exitStatus : compareStatus))
 elif [ "$isDiff" ]; then
     now="$(date +%s)"
-    while read -r epoch
+    exitStatus=3
+    while IFS=$'\n' read -r epoch || { exitStatus="$epoch"; break; }	# Exit status from the process substitution (<(getEpoch)) is lost; return the actual exit status via an incomplete (i.e. missing the newline) last line.
     do
 	printf '%d\n' "$((now - epoch))"
-    done < <(getEpoch "$@")
+    done < <(getEpoch "$@"; printf %d "$?")
+    exit $exitStatus
 else
     getEpoch "$@"
 fi
