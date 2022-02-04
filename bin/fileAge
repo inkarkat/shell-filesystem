@@ -48,13 +48,18 @@ do
     esac
 done
 
+getEpoch()
+{
+    stat --dereference --format %Y -- "$@"
+}
+
 if [ -n "$compareOp" ]; then
     if [ $# -ne 1 ]; then
 	printUsage "$0" >&2
 	exit 2
     fi
     now="$(date +%s)"
-    epoch=$(stat --dereference --format %Y -- "$@")
+    epoch=$(getEpoch "$@")
 
     [ $((now - epoch)) $compareOp $age ]
 elif [ "$isDiff" ]; then
@@ -62,7 +67,7 @@ elif [ "$isDiff" ]; then
     while read -r epoch
     do
 	printf '%d\n' "$((now - epoch))"
-    done < <(stat --dereference --format %Y -- "$@")
+    done < <(getEpoch "$@")
 else
-    exec stat --dereference --format %Y -- "$@"
+    getEpoch "$@"
 fi
