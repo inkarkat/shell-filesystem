@@ -12,12 +12,12 @@ HELPTEXT
     printf 'Usage: reldate --epoch "$(%q %s)"\n' "$(basename "$1")" '[--] FILE'
     echo
     cat <<HELPTEXT
-Test whether the age of FILE is greater / smaller than AGE.
+Test whether the age of [all] FILE[s] is greater / smaller than AGE.
 SUFFIX may be 's' for seconds (the default), 'm' for minutes, 'h' for hours, 'd'
 for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
 HELPTEXT
     echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--newer|-o|--older|-lt|-le|-eq|-ne|-ge|-gt AGE[SUFFIX] [--] FILE'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--newer|-o|--older|-lt|-le|-eq|-ne|-ge|-gt AGE[SUFFIX] [--] FILE [...]'
 }
 
 timeToSeconds()
@@ -53,7 +53,7 @@ do
     esac
 done
 typeset -a requiredArgs=(-ge 1); [ -n "$compareOp" ] && requiredArgs=(-eq 1)
-if ! [ $# "${requiredArgs[@]}" ]; then
+if [ $# -eq 0 ]; then
     printUsage "$0" >&2
     exit 2
 fi
@@ -65,9 +65,10 @@ getEpoch()
 
 if [ -n "$compareOp" ]; then
     now="$(date +%s)"
-    epoch=$(getEpoch "$@")
-
-    [ $((now - epoch)) $compareOp $age ]
+    while read -r epoch
+    do
+	[ $((now - epoch)) $compareOp $age ] || exit 1
+    done < <(getEpoch "$@")
 elif [ "$isDiff" ]; then
     now="$(date +%s)"
     while read -r epoch
