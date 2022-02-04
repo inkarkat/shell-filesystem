@@ -7,13 +7,16 @@ printUsage()
 Show the age (time of last data modification) in seconds since the Epoch (or
 seconds passed with -d|--diff) of all passed FILE(s).
 HELPTEXT
+    echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-d|--diff] [--] FILE [...] [-?|-h|--help]'
+    printf 'Usage: reldate --epoch "$(%q %s)"\n' "$(basename "$1")" '[--] FILE'
     echo
     cat <<HELPTEXT
 Test whether the age of FILE is greater / smaller than AGE.
 SUFFIX may be 's' for seconds (the default), 'm' for minutes, 'h' for hours, 'd'
 for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
 HELPTEXT
+    echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--newer AGE[SUFFIX]|-o|--older AGE[SUFFIX] [--] FILE'
 }
 
