@@ -4,16 +4,28 @@ shopt -qs extglob
 printUsage()
 {
     cat <<HELPTEXT
-Show the age (in seconds since the Epoch, or seconds with -d|--diff) of all passed FILE(s).
+Show the age (time of last data modification) in seconds since the Epoch (or
+seconds passed with -d|--diff) of all passed FILE(s).
 HELPTEXT
+    echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-d|--diff] [--] FILE [...] [-?|-h|--help]'
+    printf 'Usage: reldate --epoch "$(%q %s)"\n' "$(basename "$1")" '[--] FILE'
     echo
     cat <<HELPTEXT
-Test whether the age of FILE is greater / smaller than AGE.
+Test whether the age of [all] FILE[s] is greater / smaller than AGE.
 SUFFIX may be 's' for seconds (the default), 'm' for minutes, 'h' for hours, 'd'
 for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
 HELPTEXT
-    printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--newer AGE[SUFFIX]|-o|--older AGE[SUFFIX] [--] FILE'
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--newer|-o|--older|-lt|-le|-eq|-ne|-ge|-gt AGE[SUFFIX] [--] FILE [...]'
+    echo
+    cat <<HELPTEXT
+EXIT STATUS:
+    0	Complete success.
+    1	The comparison failed; at least one FILE did not pass it.
+    2	Bad invocation, wrong or missing command-line arguments.
+    4	Some of the passed FILE(s) do not exist.
+HELPTEXT
 }
 
 timeToSeconds()
@@ -41,27 +53,41 @@ do
 	--diff|-d)	shift; isDiff=t;;
 	--newer|-n)	shift; age="$(timeToSeconds "$1")" || exit $?; shift; compareOp=-lt;;
 	--older|-o)	shift; age="$(timeToSeconds "$1")" || exit $?; shift; compareOp=-gt;;
+	-lt|-le|-eq|-ne|-ge|-gt)
+			compareOp="$1"; shift; age="$(timeToSeconds "$1")" || exit $?; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
     esac
 done
+typeset -a requiredArgs=(-ge 1); [ -n "$compareOp" ] && requiredArgs=(-eq 1)
+if [ $# -eq 0 ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
+
+getEpoch()
+{
+    stat --dereference --format %Y -- "$@" || return 4
+}
 
 if [ -n "$compareOp" ]; then
-    if [ $# -ne 1 ]; then
-	printUsage "$0" >&2
-	exit 2
-    fi
     now="$(date +%s)"
-    epoch=$(stat --dereference --format %Y -- "$@")
-
-    [ $((now - epoch)) $compareOp $age ]
+    exitStatus=3
+    compareStatus=0
+    while IFS=$'\n' read -r epoch || { exitStatus="$epoch"; break; }	# Exit status from the process substitution (<(getEpoch)) is lost; return the actual exit status via an incomplete (i.e. missing the newline) last line.
+    do
+	[ $((now - epoch)) $compareOp $age ] || compareStatus=1
+    done < <(getEpoch "$@"; printf %d "$?")
+    exit $((exitStatus > 0 ? exitStatus : compareStatus))
 elif [ "$isDiff" ]; then
     now="$(date +%s)"
-    while read -r epoch
+    exitStatus=3
+    while IFS=$'\n' read -r epoch || { exitStatus="$epoch"; break; }	# Exit status from the process substitution (<(getEpoch)) is lost; return the actual exit status via an incomplete (i.e. missing the newline) last line.
     do
 	printf '%d\n' "$((now - epoch))"
-    done < <(stat --dereference --format %Y -- "$@")
+    done < <(getEpoch "$@"; printf %d "$?")
+    exit $exitStatus
 else
-    exec stat --dereference --format %Y -- "$@"
+    getEpoch "$@"
 fi
