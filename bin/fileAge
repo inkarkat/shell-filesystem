@@ -52,6 +52,11 @@ do
 	*)		break;;
     esac
 done
+typeset -a requiredArgs=(-ge 1); [ -n "$compareOp" ] && requiredArgs=(-eq 1)
+if ! [ $# "${requiredArgs[@]}" ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
 
 getEpoch()
 {
@@ -59,10 +64,6 @@ getEpoch()
 }
 
 if [ -n "$compareOp" ]; then
-    if [ $# -ne 1 ]; then
-	printUsage "$0" >&2
-	exit 2
-    fi
     now="$(date +%s)"
     epoch=$(getEpoch "$@")
 
