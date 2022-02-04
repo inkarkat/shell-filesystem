@@ -17,7 +17,7 @@ SUFFIX may be 's' for seconds (the default), 'm' for minutes, 'h' for hours, 'd'
 for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
 HELPTEXT
     echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--newer AGE[SUFFIX]|-o|--older AGE[SUFFIX] [--] FILE'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--newer|-o|--older|-lt|-le|-eq|-ne|-ge|-gt AGE[SUFFIX] [--] FILE'
 }
 
 timeToSeconds()
@@ -45,6 +45,8 @@ do
 	--diff|-d)	shift; isDiff=t;;
 	--newer|-n)	shift; age="$(timeToSeconds "$1")" || exit $?; shift; compareOp=-lt;;
 	--older|-o)	shift; age="$(timeToSeconds "$1")" || exit $?; shift; compareOp=-gt;;
+	-lt|-le|-eq|-ne|-ge|-gt)
+			compareOp="$1"; shift; age="$(timeToSeconds "$1")" || exit $?; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
