@@ -10,6 +10,7 @@ HELPTEXT
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-d|--diff] [--] FILE [...] [-?|-h|--help]'
     printf 'Usage: reldate --epoch "$(%q %s)"\n' "$(basename "$1")" '[--] FILE'
+    printf 'Usage: %q %s | reldate --epoch-lines\n' "$(basename "$1")" '[--] FILE [...]'
     echo
     cat <<HELPTEXT
 Test whether the age of [all] FILE[s] is greater / smaller than AGE.
