@@ -1,5 +1,10 @@
 #!/bin/bash
 
+: ${OUTDATEDFILEWARNING_COLOR_NONEXISTING=[7;33m}
+: ${OUTDATEDFILEWARNING_COLOR_OUTDATED=[33m}
+: ${OUTDATEDFILEWARNING_COLOR_RESET=[0m}
+[ -t 1 ] || unset "${!OUTDATEDFILEWARNING_COLOR_@}"
+
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
@@ -92,16 +97,16 @@ fileAge -le "$age" -- "$@" 2>/dev/null; status=$?
 if [ $status -ne 0 ]; then
     if [ $# -eq 1 ]; then
 	if [ $status -eq 4 ]; then
-	    printf '%s%s does not exist.\n' "${severityNonexisting}${severityNonexisting:+: }" "${subject:-$1}"
+	    printf '%s%s%s does not exist.%s\n' "$OUTDATEDFILEWARNING_COLOR_NONEXISTING" "${severityNonexisting}${severityNonexisting:+: }" "${subject:-$1}" "$OUTDATEDFILEWARNING_COLOR_RESET"
 	else
-	    printf '%s%s is older than %s: %s\n' "${severityOutdated}${severityOutdated:+: }" "${subject:-$1}" "$age" "$(reldate --epoch "$(fileAge -- "$1")" 2>/dev/null || printf 'n/a')"
+	    printf '%s%s%s is older than %s: %s%s\n' "$OUTDATEDFILEWARNING_COLOR_OUTDATED" "${severityOutdated}${severityOutdated:+: }" "${subject:-$1}" "$age" "$(reldate --epoch "$(fileAge -- "$1")" 2>/dev/null || printf 'n/a')" "$OUTDATEDFILEWARNING_COLOR_RESET"
 	fi
     else
 	if [ $status -eq 4 ]; then
-	    printf '%sSome %s do not exist.\n' "${severityNonexisting}${severityNonexisting:+: }" "${subject:-file(s)}"
+	    printf '%s%sSome %s do not exist.%s\n' "$OUTDATEDFILEWARNING_COLOR_NONEXISTING" "${severityNonexisting}${severityNonexisting:+: }" "${subject:-file(s)}" "$OUTDATEDFILEWARNING_COLOR_RESET"
 	else
 	    oldestFile="$(fileAge --with-filename -- "$@" | sort --numeric-sort | head -n 1 | reldate --epoch-lines)"
-	    printf '%sSome %s are older than %s: %s\n' "${severityOutdated}${severityOutdated:+: }" "${subject:-file(s)}" "$age" "${oldestFile/$'\t'/: }"
+	    printf '%s%sSome %s are older than %s: %s%s\n' "$OUTDATEDFILEWARNING_COLOR_OUTDATED" "${severityOutdated}${severityOutdated:+: }" "${subject:-file(s)}" "$age"  "${oldestFile/$'\t'/: }" "$OUTDATEDFILEWARNING_COLOR_RESET"
 	fi
     fi
     exit $status
