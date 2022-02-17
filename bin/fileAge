@@ -5,10 +5,11 @@ printUsage()
 {
     cat <<HELPTEXT
 Show the age (time of last data modification) in seconds since the Epoch (or
-seconds passed with -d|--diff) of all passed FILE(s).
+seconds passed with -d|--diff) of all passed FILE(s). With -f|--with-filename,
+appends a tab and the file name to each line.
 HELPTEXT
     echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-d|--diff] [--] FILE [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-d|--diff] [-f|--with-filename] [--] FILE [...] [-?|-h|--help]'
     printf 'Usage: reldate --epoch "$(%q %s)"\n' "$(basename "$1")" '[--] FILE'
     printf 'Usage: %q %s | reldate --epoch-lines\n' "$(basename "$1")" '[--] FILE [...]'
     echo
@@ -47,11 +48,14 @@ timeToSeconds()
 
 compareOp=
 isDiff=
+formatAddendum=
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
 	--diff|-d)	shift; isDiff=t;;
+	--with-filename|-f)
+			shift; formatAddendum=$'\t%n';;
 	--newer|-n)	shift; age="$(timeToSeconds "$1")" || exit $?; shift; compareOp=-lt;;
 	--older|-o)	shift; age="$(timeToSeconds "$1")" || exit $?; shift; compareOp=-gt;;
 	-lt|-le|-eq|-ne|-ge|-gt)
@@ -69,10 +73,17 @@ fi
 
 getEpoch()
 {
-    stat --dereference --format %Y -- "$@" || return 4
+    stat --dereference --format "%Y${formatAddendum}" -- "$@" || return 4
 }
 
 if [ -n "$compareOp" ]; then
+    if [ -n "$formatAddendum" ]; then
+	echo 'ERROR: Cannot combine -f|--with-filename with AGE comparison.'
+	echo
+	printUsage "$0"
+	exit 2
+    fi >&2
+
     now="$(date +%s)"
     exitStatus=3
     compareStatus=0
@@ -84,9 +95,13 @@ if [ -n "$compareOp" ]; then
 elif [ "$isDiff" ]; then
     now="$(date +%s)"
     exitStatus=3
-    while IFS=$'\n' read -r epoch || { exitStatus="$epoch"; break; }	# Exit status from the process substitution (<(getEpoch)) is lost; return the actual exit status via an incomplete (i.e. missing the newline) last line.
+    while IFS=$'\t' read -r epoch addendum || { exitStatus="$epoch"; break; }	# Exit status from the process substitution (<(getEpoch)) is lost; return the actual exit status via an incomplete (i.e. missing the newline) last line.
     do
-	printf '%d\n' "$((now - epoch))"
+	if [ -n "$formatAddendum" ]; then
+	    printf '%d	%s\n' "$((now - epoch))" "$addendum"
+	else
+	    printf '%d\n' "$((now - epoch))"
+	fi
     done < <(getEpoch "$@"; printf %d "$?")
     exit $exitStatus
 else
