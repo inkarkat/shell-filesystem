@@ -60,8 +60,9 @@ BEGIN {
 }
 {
     if ($0 > fileAge) {
-	fileAge = $0;
+	fileAge = $0
 	getline filespec
+	filespec = gensub(/^\.\//, "", 1, filespec)
     } else {
 	getline
     }
