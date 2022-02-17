@@ -1,16 +1,49 @@
 #!/bin/bash
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s >&2\n' "$(basename "$1")" '[--ignore-nonexisting|--severity-nonexisting SEVERITY] [--severity SEVERITY] [--subject SUBJECT] [--] AGE[SUFFIX] FILE [...]'
+}
 printUsage()
 {
-    cat <<HELPTEXT
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
 Print a warning if [any of] the passed FILE[s] is older than AGE (or does not
-exist at all, unless --ignore-nonexisting is given).
+exist at all).
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --ignore-nonexisting
+			Do not warn if a FILE does not exist; just ignore those.
+    --severity-nonexisting SEVERITY
+			Prepend SEVERITY: to the warning about non-existing
+			file(s).
+    --severity SEVERITY	Prepend SEVERITY: instead of Warning:, for both outdated
+			and non-existing files (unless --severity-nonexisting is
+			also given).
+    --subject SUBJECT	Mention SUBJECT instead of the filename / "file(s)" in
+			the message.
 SUFFIX may be 's' for seconds (the default), 'm' for minutes, 'h' for hours, 'd'
 for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
-Exits with 1 if a warning has been printed, 0 if all FILE(s) are newer.
+
+EXIT STATUS:
+    0	All file(s) are recent.
+    1	Outdated file(s) were found and warned about.
+    2	Bad invocation, wrong or missing command-line arguments.
+    4	Warned about non-existing file(s).
 HELPTEXT
-    echo
-    printf 'Usage: %q %s >&2\n' "$(basename "$1")" '[--ignore-nonexisting|--severity-nonexisting SEVERITY] [--severity SEVERITY] [--subject SUBJECT] [--] AGE[SUFFIX] FILE [...]'
 }
 
 isIgnoreNonexisting=
@@ -20,7 +53,7 @@ subject=
 while [ $# -ne 0 ]
 do
     case "$1" in
-	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--ignore-nonexisting)
 			shift; isIgnoreNonexisting=t;;
 	--severity-nonexisting)
@@ -71,5 +104,5 @@ if [ $status -ne 0 ]; then
 	    printf '%sSome %s are older than %s: %s\n' "${severityOutdated}${severityOutdated:+: }" "${subject:-file(s)}" "$age" "${oldestFile/$'\t'/: }"
 	fi
     fi
-    exit 1
+    exit $status
 fi
