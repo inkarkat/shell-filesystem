@@ -3,19 +3,23 @@
 printUsage()
 {
     cat <<HELPTEXT
-Print a warning if [any of] the passed FILE[s] is older than AGE.
+Print a warning if [any of] the passed FILE[s] is older than AGE (or does not
+exist at all, unless --ignore-nonexisting is given).
 SUFFIX may be 's' for seconds (the default), 'm' for minutes, 'h' for hours, 'd'
 for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
 Exits with 1 if a warning has been printed, 0 if all FILE(s) are newer.
 HELPTEXT
     echo
-    printf 'Usage: %q %s >&2\n' "$(basename "$1")" '[--] AGE[SUFFIX] FILE [...]'
+    printf 'Usage: %q %s >&2\n' "$(basename "$1")" '[--ignore-nonexisting] [--] AGE[SUFFIX] FILE [...]'
 }
 
+isIgnoreNonexisting=
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--ignore-nonexisting)
+			shift; isIgnoreNonexisting=t;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -33,6 +37,15 @@ elif [ $# -lt 2 ]; then
     exit 2
 fi >&2
 age="$1"; shift
+
+if [ "$isIgnoreNonexisting" ]; then
+    typeset -a temp=()
+    for filespec
+    do
+	[ -e "$filespec" ] && temp+=("$filespec")
+    done
+    set -- "${temp[@]}"
+fi
 
 fileAge -le "$age" -- "$@" 2>/dev/null; status=$?
 if [ $status -ne 0 ]; then
