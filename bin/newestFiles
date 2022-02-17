@@ -131,7 +131,7 @@ typeset -a filespecs=()
 for dirOrFile
 do
     if [ -d "$dirOrFile" ]; then
-	filespecs+=("$dirOrFile"/*)
+	filespecs+=("${dirOrFile%/}"/*)
     elif [ -e "$dirOrFile" ]; then
 	filespecs+=("$dirOrFile")
     fi
