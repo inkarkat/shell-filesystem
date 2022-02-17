@@ -10,11 +10,12 @@ for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
 Exits with 1 if a warning has been printed, 0 if all FILE(s) are newer.
 HELPTEXT
     echo
-    printf 'Usage: %q %s >&2\n' "$(basename "$1")" '[--ignore-nonexisting] [--severity SEVERITY] [--subject SUBJECT] [--] AGE[SUFFIX] FILE [...]'
+    printf 'Usage: %q %s >&2\n' "$(basename "$1")" '[--ignore-nonexisting|--severity-nonexisting SEVERITY] [--severity SEVERITY] [--subject SUBJECT] [--] AGE[SUFFIX] FILE [...]'
 }
 
 isIgnoreNonexisting=
-severity='Warning'
+severityOutdated='Warning'
+unset severityNonexisting
 subject=
 while [ $# -ne 0 ]
 do
@@ -22,7 +23,9 @@ do
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
 	--ignore-nonexisting)
 			shift; isIgnoreNonexisting=t;;
-	--severity)	shift; severity="$1"; shift;;
+	--severity-nonexisting)
+			shift; severityNonexisting="$1"; shift;;
+	--severity)	shift; severityOutdated="$1"; shift;;
 	--subject)	shift; subject="$1"; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
@@ -40,6 +43,7 @@ elif [ $# -lt 2 ]; then
     printUsage "$0"
     exit 2
 fi >&2
+: ${severityNonexisting=$severityOutdated}
 age="$1"; shift
 
 if [ "$isIgnoreNonexisting" ]; then
@@ -55,16 +59,16 @@ fileAge -le "$age" -- "$@" 2>/dev/null; status=$?
 if [ $status -ne 0 ]; then
     if [ $# -eq 1 ]; then
 	if [ $status -eq 4 ]; then
-	    printf '%s%s does not exist.\n' "${severity}${severity:+: }" "${subject:-$1}"
+	    printf '%s%s does not exist.\n' "${severityNonexisting}${severityNonexisting:+: }" "${subject:-$1}"
 	else
-	    printf '%s%s is older than %s: %s\n' "${severity}${severity:+: }" "${subject:-$1}" "$age" "$(reldate --epoch "$(fileAge -- "$1")" 2>/dev/null || printf 'n/a')"
+	    printf '%s%s is older than %s: %s\n' "${severityOutdated}${severityOutdated:+: }" "${subject:-$1}" "$age" "$(reldate --epoch "$(fileAge -- "$1")" 2>/dev/null || printf 'n/a')"
 	fi
     else
 	if [ $status -eq 4 ]; then
-	    printf '%sSome %s do not exist.\n' "${severity}${severity:+: }" "${subject:-file(s)}"
+	    printf '%sSome %s do not exist.\n' "${severityNonexisting}${severityNonexisting:+: }" "${subject:-file(s)}"
 	else
 	    oldestFile="$(fileAge --with-filename -- "$@" | sort --numeric-sort | head -n 1 | reldate --epoch-lines)"
-	    printf '%sSome %s are older than %s: %s\n' "${severity}${severity:+: }" "${subject:-file(s)}" "$age" "${oldestFile/$'\t'/: }"
+	    printf '%sSome %s are older than %s: %s\n' "${severityOutdated}${severityOutdated:+: }" "${subject:-file(s)}" "$age" "${oldestFile/$'\t'/: }"
 	fi
     fi
     exit 1
