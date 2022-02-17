@@ -1,0 +1,113 @@
+#!/bin/bash
+
+: ${OUTDATEDFILEWARNING_COLOR_NONEXISTING=[7;33m}
+: ${OUTDATEDFILEWARNING_COLOR_OUTDATED=[33m}
+: ${OUTDATEDFILEWARNING_COLOR_RESET=[0m}
+[ -t 1 ] || unset "${!OUTDATEDFILEWARNING_COLOR_@}"
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s >&2\n' "$(basename "$1")" '[--ignore-nonexisting|--severity-nonexisting SEVERITY] [--severity SEVERITY] [--subject SUBJECT] [--] AGE[SUFFIX] FILE [...]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Print a warning if [any of] the passed FILE[s] is older than AGE (or does not
+exist at all).
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --ignore-nonexisting
+			Do not warn if a FILE does not exist; just ignore those.
+    --severity-nonexisting SEVERITY
+			Prepend SEVERITY: to the warning about non-existing
+			file(s).
+    --severity SEVERITY	Prepend SEVERITY: instead of Warning:, for both outdated
+			and non-existing files (unless --severity-nonexisting is
+			also given).
+    --subject SUBJECT	Mention SUBJECT instead of the filename / "file(s)" in
+			the message.
+SUFFIX may be 's' for seconds (the default), 'm' for minutes, 'h' for hours, 'd'
+for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
+
+EXIT STATUS:
+    0	All file(s) are recent.
+    1	Outdated file(s) were found and warned about.
+    2	Bad invocation, wrong or missing command-line arguments.
+    4	Warned about non-existing file(s).
+HELPTEXT
+}
+
+isIgnoreNonexisting=
+severityOutdated='Warning'
+unset severityNonexisting
+subject=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--ignore-nonexisting)
+			shift; isIgnoreNonexisting=t;;
+	--severity-nonexisting)
+			shift; severityNonexisting="$1"; shift;;
+	--severity)	shift; severityOutdated="$1"; shift;;
+	--subject)	shift; subject="$1"; shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -lt 1 ]; then
+    echo 'ERROR: No AGE[SUFFIX] passed.'
+    echo
+    printUsage "$0"
+    exit 2
+elif [ $# -lt 2 ]; then
+    echo 'ERROR: No FILE(s) passed.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
+: ${severityNonexisting=$severityOutdated}
+age="$1"; shift
+
+if [ "$isIgnoreNonexisting" ]; then
+    typeset -a temp=()
+    for filespec
+    do
+	[ -e "$filespec" ] && temp+=("$filespec")
+    done
+    set -- "${temp[@]}"
+fi
+
+fileAge -le "$age" -- "$@" 2>/dev/null; status=$?
+if [ $status -ne 0 ]; then
+    if [ $# -eq 1 ]; then
+	if [ $status -eq 4 ]; then
+	    printf '%s%s%s does not exist.%s\n' "$OUTDATEDFILEWARNING_COLOR_NONEXISTING" "${severityNonexisting}${severityNonexisting:+: }" "${subject:-$1}" "$OUTDATEDFILEWARNING_COLOR_RESET"
+	else
+	    printf '%s%s%s is older than %s: %s%s\n' "$OUTDATEDFILEWARNING_COLOR_OUTDATED" "${severityOutdated}${severityOutdated:+: }" "${subject:-$1}" "$age" "$(reldate --epoch "$(fileAge -- "$1")" 2>/dev/null || printf 'n/a')" "$OUTDATEDFILEWARNING_COLOR_RESET"
+	fi
+    else
+	if [ $status -eq 4 ]; then
+	    printf '%s%sSome %s do not exist.%s\n' "$OUTDATEDFILEWARNING_COLOR_NONEXISTING" "${severityNonexisting}${severityNonexisting:+: }" "${subject:-file(s)}" "$OUTDATEDFILEWARNING_COLOR_RESET"
+	else
+	    oldestFile="$(fileAge --with-filename -- "$@" | sort --numeric-sort | head -n 1 | reldate --epoch-lines)"
+	    printf '%s%sSome %s are older than %s: %s%s\n' "$OUTDATEDFILEWARNING_COLOR_OUTDATED" "${severityOutdated}${severityOutdated:+: }" "${subject:-file(s)}" "$age"  "${oldestFile/$'\t'/: }" "$OUTDATEDFILEWARNING_COLOR_RESET"
+	fi
+    fi
+    exit $status
+fi
