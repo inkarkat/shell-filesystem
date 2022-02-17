@@ -1,0 +1,54 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+Print a warning if [any of] the passed FILE[s] is older than AGE.
+SUFFIX may be 's' for seconds (the default), 'm' for minutes, 'h' for hours, 'd'
+for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
+Exits with 1 if a warning has been printed, 0 if all FILE(s) are newer.
+HELPTEXT
+    echo
+    printf 'Usage: %q %s >&2\n' "$(basename "$1")" '[--] AGE[SUFFIX] FILE [...]'
+}
+
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -lt 1 ]; then
+    echo 'ERROR: No AGE[SUFFIX] passed.'
+    echo
+    printUsage "$0"
+    exit 2
+elif [ $# -lt 2 ]; then
+    echo 'ERROR: No FILE(s) passed.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
+age="$1"; shift
+
+fileAge -le "$age" -- "$@" 2>/dev/null; status=$?
+if [ $status -ne 0 ]; then
+    if [ $# -eq 1 ]; then
+	if [ $status -eq 4 ]; then
+	    printf 'Warning: %s does not exist.\n' "$1"
+	else
+	    printf 'Warning: %s is older than %s: %s\n' "$1" "$age" "$(reldate --epoch "$(fileAge -- "$1")" 2>/dev/null || printf 'n/a')"
+	fi
+    else
+	if [ $status -eq 4 ]; then
+	    printf 'Warning: Some file(s) do not exist.\n'
+	else
+	    oldestFile="$(fileAge --with-filename -- "$@" | sort --numeric-sort | head -n 1 | reldate --epoch-lines)"
+	    printf 'Warning: Some file(s) are older than %s: %s\n' "$age" "${oldestFile/$'\t'/: }"
+	fi
+    fi
+    exit 1
+fi
