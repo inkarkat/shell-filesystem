@@ -4,7 +4,8 @@ shopt -qs extglob
 printUsage()
 {
     cat <<HELPTEXT
-Show the total size in bytes (or relative to DIFF-FILE) of all passed FILE(s).
+Show the total size in bytes (or relative to DIFF-FILE) of all passed FILE(s)
+(with appended filename if multiple are given).
 HELPTEXT
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-d|--diff DIFF-FILE] [--] FILE [...] [-?|-h|--help]'
@@ -28,7 +29,8 @@ HELPTEXT
 
 getSize()
 {
-    stat --dereference --format %s -- "$@" || return 4
+    local format='%s'; [ $# -gt 1 ] && format="$format"$'\t%n'
+    stat --dereference --format "$format"  -- "$@" || return 4
 }
 
 compareOp=
@@ -55,16 +57,16 @@ fi
 if [ -n "$compareOp" ]; then
     exitStatus=3
     compareStatus=0
-    while IFS=$'\n' read -r fileSize || { exitStatus="$fileSize"; break; }	# Exit status from the process substitution (<(getSize)) is lost; return the actual exit status via an incomplete (i.e. missing the newline) last line.
+    while read -r fileSize filespec || { exitStatus="$fileSize"; break; }	# Exit status from the process substitution (<(getSize)) is lost; return the actual exit status via an incomplete (i.e. missing the newline) last line.
     do
 	[ $fileSize $compareOp $size ] || compareStatus=1
     done < <(getSize "$@"; printf %d "$?")
     exit $((exitStatus > 0 ? exitStatus : compareStatus))
 elif [ -n "$diffSize" ]; then
     exitStatus=3
-    while IFS=$'\n' read -r fileSize || { exitStatus="$fileSize"; break; }	# Exit status from the process substitution (<(getSize)) is lost; return the actual exit status via an incomplete (i.e. missing the newline) last line.
+    while read -r fileSize filespec || { exitStatus="$fileSize"; break; }	# Exit status from the process substitution (<(getSize)) is lost; return the actual exit status via an incomplete (i.e. missing the newline) last line.
     do
-	printf '%d\n' "$((fileSize - diffSize))"
+	printf "%d${filespec:+\\t}%s\\n" "$((fileSize - diffSize))" "$filespec"
     done < <(getSize "$@"; printf %d "$?")
     exit $exitStatus
 else
