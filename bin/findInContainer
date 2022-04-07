@@ -61,7 +61,7 @@ do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--filter-command)
-			shift; filterCommand="${filterCommand}|$1"; shift;;
+			shift; filterCommand+="|$1"; shift;;
 	--prefixed)	shift
 			printf -v prefixSeparator %q "$FINDINCONTAINER_PREFIX_SEPARATOR"
 			contextCommand="prefix --skip-empty -- {}${prefixSeparator}"

@@ -29,9 +29,9 @@ do
     [ ! -d "$filename" -a -x "$filename" ] || continue
 
     if [ $executableCnt -lt $GET_EXECUTABLE_DETAILS_FOR_DIR_MAX_SHOW_COMMANDS ]; then
-	executableDetails="${executableDetails}${executableDetails:+, }$filename"
+	executableDetails+="${executableDetails:+, }$filename"
     elif [ $executableCnt -eq $GET_EXECUTABLE_DETAILS_FOR_DIR_MAX_SHOW_COMMANDS ]; then
-	executableDetails="${executableDetails}, ..."
+	executableDetails+=', ...'
     fi
 
     let executableCnt+=1
