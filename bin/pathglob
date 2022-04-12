@@ -38,7 +38,7 @@ if [ $# -eq 0 ]; then
 fi
 typeset -a shortenPipeline=()
 if [ "$output" = 'basename' ] || [ -z "$output" -a ${#path[@]} -eq 0 ]; then
-    typeset -a shortenPipeline=(xargs -n 1 basename)
+    typeset -a shortenPipeline=(xargs -d '\n' basename --multiple)
 fi
 
 eval 'exec pathfind "${path[@]}" -maxdepth 1 "${findArgs[@]}" -name "$@"' "${shortenPipeline:+|}" '"${shortenPipeline[@]}"'
