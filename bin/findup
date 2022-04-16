@@ -189,7 +189,11 @@ processGlobMatches()
     local status=1
     for f in "${filespecs[@]}"
     do
-	processMatches '%s/%s' "${PWD%/}" "$f" && status=0
+	if [ "$f" = '.' ]; then
+	    processMatches '%s' "$PWD"
+	else
+	    processMatches '%s/%s' "${PWD%/}" "$f"
+	fi && status=0
     done
     return $status
 }
