@@ -60,3 +60,4 @@ _mount_complete()
     "${COMP_DELEGATE_FUNCTION:?}" "${COMP_DELEGATE_COMMAND:?}" "${@:2}"
 }
 completeWithDelegationTo mount -F _mount_complete mount
+completeWithDelegationTo umount -F _mount_complete umount
