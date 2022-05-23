@@ -27,13 +27,16 @@ printUsage()
 Test whether the current working directory or (all) passed FILE(s) lie inside
 (any of) the directory tree(s) at DIRSPEC.
 HELPTEXT
+    echo
     printf 'Usage: %q %s\n' "$(basename "$1")" 'DIRSPEC [FILE [...]] [-?|-h|--help]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '-d|--dir DIRSPEC [...] [--] [FILE [...]] [-?|-h|--help]'
-
+    echo
     cat <<HELPTEXT
 Print those passed FILE(s) which / the current working directory if it lies
-inside (any of) the directory tree(s) at DIRSPEC. Exits with 1 if none is inside.
+inside (any of) the directory tree(s) at DIRSPEC.
+Exits with 1 if none is inside.
 HELPTEXT
+    echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '-p|--print -d|--dir DIRSPEC [...] [--] [FILE [...]] [-?|-h|--help]'
 }
 case "$1" in
