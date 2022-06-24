@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-o|--owner OWNER] [-g|--group GROUP] [-m|--mode MODE] [-L|--dereference] [--] FILE [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-o|--owner OWNER] [-g|--group GROUP] [-m|--mode MODE] [-L|--dereference] [--] FILE|DIR [-?|-h|--help]'
 }
 printUsage()
 {
@@ -19,7 +19,7 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Check whether FILE has OWNER / GROUP / MODE.
+Check whether FILE|DIR has OWNER / GROUP / MODE.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -35,11 +35,11 @@ HELPDESCRIPTION
     --dereference|-L	Follow links.
 
 EXIT STATUS:
-    0	FILE already has the supplied attributes.
-    1	FILE's attributes differ.
+    0	FILE|DIR already has the supplied attributes.
+    1	FILE|DIR's attributes differ.
     2	Bad invocation, wrong or missing command-line arguments.
     3   Internal error or failed assertion.
-    4	FILE does not exist.
+    4	FILE|DIR does not exist.
 HELPTEXT
 }
 
@@ -73,7 +73,7 @@ fi
 
 filespec="${1:?}"; shift
 if [ ! -e "$filespec" ]; then
-    printf >&2 'ERROR: FILE does not exist: %s\n' "$(realpath --no-symlinks -- "$filespec")"
+    printf >&2 'ERROR: FILE|DIR does not exist: %s\n' "$(realpath --no-symlinks -- "$filespec")"
     exit 3
 fi
 
@@ -84,13 +84,21 @@ getMode()
 checkMode()
 {
     # Due to the various formats of the passed mode, let's do the comparison by
-    # creating a temp file and comparing its mode.
-    local TMPFILE="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${TEMP:-/tmp}/$(basename -- "$0").$$$RANDOM")"
-    install --no-target-directory --mode "$mode" -- /dev/null "$TMPFILE" 2>/dev/null || exit 3
+    # creating a temp file / dir and comparing its mode.
+    if [ -d "$filespec" ]; then
+	local TMPFILE="$(mktemp --directory --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || { dirspec="${TEMP:-/tmp}/$(basename -- "$0").$$$RANDOM"; mkdir -p -- "$dirspec" && printf %s "$dirspec"; })" || exit 3
+	chmod a= -- "$TMPFILE" || exit 3
+	chmod "$mode" -- "$TMPFILE" || exit 3
+	typeset -a cleanupCommand=(rmdir)
+    else
+	local TMPFILE="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${TEMP:-/tmp}/$(basename -- "$0").$$$RANDOM")"
+	install --no-target-directory --mode "$mode" -- /dev/null "$TMPFILE" 2>/dev/null || exit 3
+	typeset -a cleanupCommand=(rm --force)
+    fi
 
     local desiredMode="$(getMode "$TMPFILE")"
     local actualMode="$(getMode "$filespec")"
-    rm --force -- "$TMPFILE" 2>/dev/null
+    "${cleanupCommand[@]}" -- "$TMPFILE" 2>/dev/null
     [ "$desiredMode" = "$actualMode" ]
 }
 
