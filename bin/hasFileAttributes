@@ -30,8 +30,11 @@ HELPDESCRIPTION
     --group|-g GROUP	Check group ownership. GROUP may be either a group name
 			or a numeric group ID.
     --mode|-m MODE	Check permission mode; MODE can be either an octal
-			number, or a symbolic mode as in 'chmod', with 'a=' (no
-			access allowed to anyone) as the point of departure.
+			number, or a symbolic mode as in 'chmod', with
+			FILE|DIR's existing permissions as the point of
+			departure. So if you pass g+w,o+w, it is only verified
+			that group and world can write; all other access types
+			are ignored.
     --dereference|-L	Follow links.
 
 EXIT STATUS:
@@ -85,16 +88,16 @@ checkMode()
 {
     # Due to the various formats of the passed mode, let's do the comparison by
     # creating a temp file / dir and comparing its mode.
+    local TMPFILE
     if [ -d "$filespec" ]; then
-	local TMPFILE="$(mktemp --directory --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || { dirspec="${TEMP:-/tmp}/$(basename -- "$0").$$$RANDOM"; mkdir -p -- "$dirspec" && printf %s "$dirspec"; })" || exit 3
-	chmod a= -- "$TMPFILE" || exit 3
-	chmod "$mode" -- "$TMPFILE" || exit 3
+	TMPFILE="$(mktemp --directory --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || { dirspec="${TEMP:-/tmp}/$(basename -- "$0").$$$RANDOM"; mkdir -p -- "$dirspec" && printf %s "$dirspec"; })" || exit 3
 	typeset -a cleanupCommand=(rmdir)
     else
-	local TMPFILE="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${TEMP:-/tmp}/$(basename -- "$0").$$$RANDOM")"
-	install --no-target-directory --mode "$mode" -- /dev/null "$TMPFILE" 2>/dev/null || exit 3
+	TMPFILE="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || { filespec="${TEMP:-/tmp}/$(basename -- "$0").$$$RANDOM"; touch -- "$filespec" && printf %s "$filespec"; })" || exit 3
 	typeset -a cleanupCommand=(rm --force)
     fi
+    chmod --reference "$filespec" -- "$TMPFILE" || exit 3
+    chmod "$mode" -- "$TMPFILE" || exit 3
 
     local desiredMode="$(getMode "$TMPFILE")"
     local actualMode="$(getMode "$filespec")"
