@@ -38,6 +38,7 @@ EXIT STATUS:
     0	FILE already has the supplied attributes.
     1	FILE's attributes differ.
     2	Bad invocation, wrong or missing command-line arguments.
+    3   Internal error or failed assertion.
     4	FILE does not exist.
 HELPTEXT
 }
@@ -85,7 +86,8 @@ checkMode()
     # Due to the various formats of the passed mode, let's do the comparison by
     # creating a temp file and comparing its mode.
     local TMPFILE="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${TEMP:-/tmp}/$(basename -- "$0").$$$RANDOM")"
-    install --no-target-directory --mode "$mode" -- /dev/null "$TMPFILE" 2>/dev/null || return 1
+    install --no-target-directory --mode "$mode" -- /dev/null "$TMPFILE" 2>/dev/null || exit 3
+
     local desiredMode="$(getMode "$TMPFILE")"
     local actualMode="$(getMode "$filespec")"
     rm --force -- "$TMPFILE" 2>/dev/null
