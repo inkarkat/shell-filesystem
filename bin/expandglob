@@ -19,6 +19,7 @@ if [ $# -eq 0 ]; then
     exit 2
 fi
 
+IFS=' '
 typeset -a result=()
 for arg
 do
@@ -26,7 +27,7 @@ do
 
     # Still need to check for existing files; in case a FILE-GLOB without a
     # wildcard was passed, it's not eliminated by nullglob.
-    eval "typeset -a files=($arg)"
+    eval "typeset -a files=(${arg// /\\ })"
     for f in "${files[@]}"
     do
 	[ -e "$f" ] && result+=("$f")
