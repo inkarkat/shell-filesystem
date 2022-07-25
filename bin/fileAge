@@ -3,21 +3,21 @@ shopt -qs extglob
 
 printUsage()
 {
-    cat <<HELPTEXT
+    cat <<HELPDESCRIPTION
 Show the age (time of last data modification) in seconds since the Epoch (or
 seconds passed with -d|--diff) of all passed FILE(s). With -f|--with-filename,
 appends a tab and the file name to each line.
-HELPTEXT
+HELPDESCRIPTION
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-d|--diff] [-f|--with-filename] [--] FILE [...] [-?|-h|--help]'
     printf 'Usage: reldate --epoch "$(%q %s)"\n' "$(basename "$1")" '[--] FILE'
     printf 'Usage: %q %s | reldate --epoch-lines\n' "$(basename "$1")" '[--] FILE [...]'
     echo
-    cat <<HELPTEXT
+    cat <<HELPDESCRIPTION
 Test whether the age of [all] FILE[s] is greater / smaller than AGE.
 SUFFIX may be 's' for seconds (the default), 'm' for minutes, 'h' for hours, 'd'
 for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
-HELPTEXT
+HELPDESCRIPTION
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--newer|-o|--older|-lt|-le|-eq|-ne|-ge|-gt AGE[SUFFIX] [--] FILE [...]'
     echo
