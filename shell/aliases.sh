@@ -6,7 +6,7 @@ umount()
     if [ -d "$lastArg" ]; then
 	command umount "$@" || {
 	    status=$?
-	    showFilesInUse --title "umount $lastArg" -- "$lastArg"
+	    withUserNotify --title "umount $lastArg" --console --gui -- showFilesInUse "$lastArg"
 	    return $status
 	}
     else

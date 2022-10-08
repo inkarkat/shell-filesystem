@@ -1,10 +1,11 @@
 #!/bin/bash
+set -o pipefail
 
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-T|--title TITLE] [--what WHAT] [--] DIRSPEC [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--what WHAT] [--] DIRSPEC [-?|-h|--help]'
 }
 printUsage()
 {
@@ -18,14 +19,13 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-If files inside DIRSPEC are still in use, notify the user about them (in the
-terminal or a message box).
+If files inside DIRSPEC are still in use, notify the user about them through a
+message.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
-    --title|-T TITLE	Optional title shown as the window title.
     --what WHAT		Optional human-readable characterization of the DIRSPEC
 			mount.
 EXIT STATUS:
@@ -34,13 +34,11 @@ EXIT STATUS:
     99	No files in use have been detected.
 HELPTEXT
 }
-title=
 what=
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
-	--title|-T)	shift; title="$1"; shift;;
 	--what)		shift; what="$1"; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
@@ -54,10 +52,9 @@ fi
 
 mountDirspec="${1:?}"; shift
 literalMountDirspec="$(printf %s "${mountDirspec%/}" | sed -e 's/[][\$*.^#]/\\&/g')"
-openFileInfo="$(lsof -- "$mountDirspec" 2>/dev/null | field --remove 4 5 6 7 8 | sed -e "s#${literalMountDirspec}/##" | column -t)"
 
-[ -n "$openFileInfo" ] || exit 99
-
-userNotify ${title:+--title "$title"} --console --gui --no-markup -- "ERROR: Cannot unmount because the ${what:-mount} is still in use:
-
-$openFileInfo"
+lsof -- "$mountDirspec" 2>/dev/null \
+    | field --remove 4 5 6 7 8 \
+    | sed -e "s#${literalMountDirspec}/##" \
+    | column -t \
+    | { outputAndPrintf 'ERROR: Cannot unmount because the %s is still in use:\n\n' "${what:-mount}" || exit 99; }
