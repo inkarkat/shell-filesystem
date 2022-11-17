@@ -37,12 +37,15 @@ do
     let executableCnt+=1
 done
 
+status=0
 executableCntPlural=s
 executableCntSuffix=': '
 case "$executableCnt" in
-    0)	executableCnt='No'
+    0)	status=1
+	executableCnt='No'
 	executableCntSuffix='.'
 	;;
     1)	executableCntPlural=;;
 esac
 printf '%s command%s available%s%s\n' "$executableCnt" "$executableCntPlural" "$executableCntSuffix" "$executableDetails"
+exit $status
