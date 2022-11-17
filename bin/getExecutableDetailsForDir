@@ -10,10 +10,12 @@ Determine the number of executable commands in DIR and print a message
 mentioning the first ${GETEXECUTABLEDETAILSFORDIR_MAX_SHOW_COMMANDS} of them.
 HELPTEXT
     echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" 'DIR [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-q|--quiet] DIR [-?|-h|--help]'
 }
+isQuiet=
 case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+    --quiet|-q)		shift; isQuiet=t;;
 esac
 if [ $# -ne 1 ]; then
     printUsage "$0" >&2
@@ -26,7 +28,11 @@ executableCnt=0
 executableDetails=
 for filename in *
 do
-    [ ! -d "$filename" -a -x "$filename" ] || continue
+    if [ ! -d "$filename" -a -x "$filename" ]; then
+	[ "$isQuiet" ] && exit 0
+    else
+	continue
+    fi
 
     if [ $executableCnt -lt $GETEXECUTABLEDETAILSFORDIR_MAX_SHOW_COMMANDS ]; then
 	executableDetails+="${executableDetails:+, }$filename"
@@ -47,5 +53,5 @@ case "$executableCnt" in
 	;;
     1)	executableCntPlural=;;
 esac
-printf '%s command%s available%s%s\n' "$executableCnt" "$executableCntPlural" "$executableCntSuffix" "$executableDetails"
+[ "$isQuiet" ] || printf '%s command%s available%s%s\n' "$executableCnt" "$executableCntPlural" "$executableCntSuffix" "$executableDetails"
 exit $status
