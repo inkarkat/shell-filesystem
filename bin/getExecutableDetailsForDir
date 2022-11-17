@@ -1,13 +1,13 @@
 #!/bin/bash
 set -e # Terminate the script at first error.
 
-: ${GET_EXECUTABLE_DETAILS_FOR_DIR_MAX_SHOW_COMMANDS:=7}
+: ${GETEXECUTABLEDETAILSFORDIR_MAX_SHOW_COMMANDS:=7}
 
 printUsage()
 {
     cat <<HELPTEXT
 Determine the number of executable commands in DIR and print a message
-mentioning the first ${GET_EXECUTABLE_DETAILS_FOR_DIR_MAX_SHOW_COMMANDS} of them.
+mentioning the first ${GETEXECUTABLEDETAILSFORDIR_MAX_SHOW_COMMANDS} of them.
 HELPTEXT
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" 'DIR [-?|-h|--help]'
@@ -28,9 +28,9 @@ for filename in *
 do
     [ ! -d "$filename" -a -x "$filename" ] || continue
 
-    if [ $executableCnt -lt $GET_EXECUTABLE_DETAILS_FOR_DIR_MAX_SHOW_COMMANDS ]; then
+    if [ $executableCnt -lt $GETEXECUTABLEDETAILSFORDIR_MAX_SHOW_COMMANDS ]; then
 	executableDetails+="${executableDetails:+, }$filename"
-    elif [ $executableCnt -eq $GET_EXECUTABLE_DETAILS_FOR_DIR_MAX_SHOW_COMMANDS ]; then
+    elif [ $executableCnt -eq $GETEXECUTABLEDETAILSFORDIR_MAX_SHOW_COMMANDS ]; then
 	executableDetails+=', ...'
     fi
 
