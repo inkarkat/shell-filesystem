@@ -1,10 +1,12 @@
 #!/bin/bash
 
+: ${WRITEORIG_EXT:=orig}
+
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] [--backup-dir|-d DIR] [--delete-original] [--] FILE|DIR [...] [-?|-h|--help]'
+    printf 'Usage: [WRITEORIG_EXT=orig] %q %s\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] [--backup-dir|-d DIR] [--delete-original] [--] FILE|DIR [...] [-?|-h|--help]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] [--backup-dir|-d DIR] [--delete-original] --ignore-no-files [--] [FILE|DIR [...]] [-?|-h|--help]'
     echo
     printf 'Usage: sed -i"$(%q %s)" -e ... FILE|DIR\n' "$(basename "$1")" '--get-extension [-f|--overwrite|--once-today|-k|--keep] [--accept-nonexisting] [--] FILE|DIR'
@@ -21,7 +23,7 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Write a single backup of FILE to FILE.orig. Ignores *.orig files.
+Write a single backup of FILE to FILE.${WRITEORIG_EXT}. Ignores *.${WRITEORIG_EXT} files.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -36,13 +38,13 @@ HELPDESCRIPTION
     --backup-dir|-d DIR		Create backups in DIR instead of in the same
 				directory as the original file.
     --delete-original		Removes the original FILE after creating
-				FILE.orig; you can use this for a final backup
+				FILE.${WRITEORIG_EXT}; you can use this for a final backup
 				before getting rid of the FILE.
     --ignore-no-files		Do not complain when no FILE(s) have been
 				passed. Useful when passing a glob that may
 				resolve to no files at all, and that is
 				acceptable.
-    --get-extension		Just print the .orig backup extension (or
+    --get-extension		Just print the .${WRITEORIG_EXT} backup extension (or
 				nothing if --keep and a backup already exists).
     --accept-nonexisting	Do not print an error if FILE does not exist,
 				but simply print the would-be backup extension.
@@ -132,7 +134,7 @@ writebackup()
 {
     local -r filespec="$1"
 
-    [[ "$filespec" = *.orig ]] && return 1  # Don't backup original files themselves; this allows passing a generic glob like * to it.
+    [[ "$filespec" = *."$WRITEORIG_EXT" ]] && return 1  # Don't backup original files themselves; this allows passing a generic glob like * to it.
 
     if [ -e "$filespec" ]; then
 	if [ ! -r "$filespec" ]; then
@@ -140,9 +142,9 @@ writebackup()
 	    return 1
 	fi
 	if [ -n "$backupDir" ]; then
-	    local -r backupFilespec="${backupDir}$(basename -- "${filespec}").orig"
+	    local -r backupFilespec="${backupDir}$(basename -- "${filespec}").${WRITEORIG_EXT}"
 	else
-	    local -r backupFilespec="${filespec}.orig"
+	    local -r backupFilespec="${filespec}.${WRITEORIG_EXT}"
 	fi
 	if [ -e "$backupFilespec" ]; then
 	    if [ "$isOverwrite" ]; then
@@ -182,7 +184,7 @@ writebackup()
 	    return 1
 	fi
     elif [ "$isOnlyPrintExtension" ] && [ "$isAcceptNonexisting" ]; then
-	printf '.orig\n'
+	printf '.%s\n' "$WRITEORIG_EXT"
     else
 	printf >&2 'ERROR: "%s" does not exist!\n' "$filespec"
 	return 1

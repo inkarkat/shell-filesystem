@@ -1,0 +1,3 @@
+#!/bin/sh
+
+WRITEORIG_EXT=bak exec writeorig "$@"
