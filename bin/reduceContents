@@ -1,0 +1,118 @@
+#!/bin/bash
+set -o pipefail
+
+: ${REDUCECONTENTS_FILE_MARKER='{}'}
+: ${REDUCECONTENTS_FILE_DASH_MARKER='{-}'}
+fileMarker="$REDUCECONTENTS_FILE_MARKER"; unset REDUCECONTENTS_FILE_MARKER
+fileDashMarker="$REDUCECONTENTS_FILE_DASH_MARKER"; unset REDUCECONTENTS_FILE_DASH_MARKER
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" "-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...] ${fileMarker:+[}${fileMarker}${fileDashMarker:+|}${fileDashMarker}${fileMarker:+] [...]} ; [...] [--] DIR|FILE [...] [-?|-h|--help]"
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Execute COMMAND with passed DIR(s) expanded into the files they contain (also
+in subdirs recursively) and ${fileMarker:+either }passed as a combined content stream to stdin
+of COMMANDLINE${fileMarker:+ or the filespecs replace any $fileMarker marker inside COMMANDLINE, and
+that output is then piped to a second invocation of COMMANDLINE (which may use
+the alternative ${fileDashMarker} to keep a dash argument to signal standard input)}.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --command|-c CMD	Execute CMD as a command-line. FILEs ${fileMarker:+either }are passed
+			as a combined content stream to stdin${fileMarker:+ or replace any
+			$fileMarker or $fileDashMarker marker} inside COMMANDLINE.
+    --exec COMMAND [...] ;
+			Execute COMMAND; all following arguments are taken to be
+			arguments to the COMMAND until an argument consisting of
+			';' is encountered. FILEs ${fileMarker:+either }are passed as a
+			combined content stream to stdin${fileMarker:+ or replace any $fileMarker
+			or $fileDashMarker marker} inside COMMANDLINE.
+
+SEE ALSO:
+- withExpandedDirs just passes filespecs, not contents, and also doesn't do a
+  second invocation of COMMAND to reduce the output of processed files further.
+
+EXIT STATUS:
+    0	Complete success.
+    2	Bad invocation, wrong or missing command-line arguments.
+    99	Only empty DIR(s); therefore no resulting files; nothing executed.
+    *   any exit status from COMMAND(s)
+
+Example:
+HELPTEXT
+    printf '%q %s\n' "$(basename "$1")" '--exec md5sum {-} \; /etc/apt'
+}
+
+typeset -a commands=()
+typeset -a commandArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--command|-c)	commandArgs+=("$1" "$2"); shift; commands+=(${commands:+;} "$1"); shift;;
+	--exec)		commandArgs+=("$1"); shift
+			cmd=
+			printf -v escapedFileMarker %q "$fileMarker"
+			printf -v escapedFileDashMarker %q "$fileDashMarker"
+			while [ $# -gt 0 -a "$1" != ';' ]
+			do
+			    printf -v quotedArg '%q' "$1"
+			    quotedArg="${quotedArg//"$escapedFileMarker"/$fileMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
+			    quotedArg="${quotedArg//"$escapedFileDashMarker"/$fileDashMarker}"	# %q escapes {-}, we don't want that to have it interpolated later.
+			    cmd="${cmd}${cmd:+ }${quotedArg}"
+			    commandArgs+=("$1"); shift
+			done
+			if [ $# -eq 0 ]; then
+			    echo 'ERROR: --exec command must be concluded with ;!'; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			commandArgs+=("$1"); shift
+			commands+=(${commands:+;} "$cmd")
+			;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ ${#commands[@]} -eq 0 ]; then
+    echo 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or --exec SIMPLECOMMAND [...] ;.'
+    echo
+    printUsage "$0"
+    exit 2
+elif [ $# -eq 0 ]; then
+    echo 'ERROR: No DIR|FILE(s) passed.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
+
+printf -v quotedFiles '%q ' "$@"; quotedFiles="${quotedFiles% }"
+typeset -a interpolatedCommands=("${commands[@]}")
+interpolatedCommands=("${interpolatedCommands[@]//"$fileMarker"/$quotedFiles}")
+interpolatedCommands=("${interpolatedCommands[@]//"$fileDashMarker"/$quotedFiles}")
+if [ "${interpolatedCommands[*]}" = "${commands[*]}" ]; then
+    withExpandedDirs --recursive --exec cat -- \; -- "$@" \
+	| ifne bash -c "${interpolatedCommands[*]}"
+else
+    interpolatedCommands=("${commands[@]}")
+    interpolatedCommands=("${interpolatedCommands[@]//"$fileMarker"/}")
+    interpolatedCommands=("${interpolatedCommands[@]//"$fileDashMarker"/-}")
+    withExpandedDirs --recursive "${commandArgs[@]//"$fileDashMarker"/$fileMarker}" -- "$@" \
+	| ifne bash -c "${interpolatedCommands[*]}"
+fi
