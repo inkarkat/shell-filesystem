@@ -8,7 +8,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-r|--recursive] [-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...] ${fileMarker:+[}${fileMarker}${fileMarker:+] [...]} ; [...]] [--] DIR|FILE [...] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-r|--recursive] [--run-if-empty] [-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...] ${fileMarker:+[}${fileMarker}${fileMarker:+] [...]} ; [...]] [--] DIR|FILE [...] [-?|-h|--help]"
 }
 
 printUsage()
@@ -34,6 +34,8 @@ HELPDESCRIPTION
     --recursive|-r	Also expand subdirectories of DIR(s), and so on. By
 			default, subdirs are dropped and only the files directly
 			inside DIR are passed along.
+    --run-if-empty	Also run COMMANDs (without any supplied arguments) if
+			there is no input. By default, nothing will be executed.
     --command|-c CMD	Execute CMD as a command-line. Files ${fileMarker:+either }are appended${fileMarker:+
 			or replace any $fileMarker marker} inside COMMANDLINE.
     --exec COMMAND [...] ;
@@ -49,12 +51,14 @@ EXIT STATUS:
 HELPTEXT
 }
 
+isRunIfEmpty=
 glob='*'
 typeset -a commands=()
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--run-if-empty)	shift; isRunIfEmpty=t;;
 	--recursive|-r)	shift; glob='**';;
 	--command|-c)	shift; commands+=(${commands:+;} "$1"); shift;;
 	--exec)		shift
@@ -99,9 +103,9 @@ do
     fi
 done
 
-[ ${#files[@]} -gt 0 ] || exit 99
+[ ${#files[@]} -gt 0 ] || [ "$isRunIfEmpty" ] || exit 99
 
-printf -v quotedFiles '%q ' "${files[@]}"; quotedFiles="${quotedFiles% }"
+quotedFiles=; [ ${#files[@]} -gt 0 ] && printf -v quotedFiles '%q ' "${files[@]}"; quotedFiles="${quotedFiles% }"
 typeset -a interpolatedCommands=("${commands[@]//"$fileMarker"/$quotedFiles}")
 [ "${interpolatedCommands[*]}" = "${commands[*]}" ] && interpolatedCommands+=("$quotedFiles")
 
