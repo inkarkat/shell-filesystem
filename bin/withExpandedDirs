@@ -1,0 +1,108 @@
+#!/bin/bash
+shopt -qs dotglob globstar nullglob
+
+: ${WITHEXPANDEDDIRS_FILE_MARKER='{}'}
+fileMarker="$WITHEXPANDEDDIRS_FILE_MARKER"; unset WITHEXPANDEDDIRS_FILE_MARKER
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-r|--recursive] [-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...] ${fileMarker:+[}${fileMarker}${fileMarker:+] [...]} ; [...]] [--] DIR|FILE [...] [-?|-h|--help]"
+}
+
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+
+printLongUsage()
+{
+    cat <<HELPDESCRIPTION
+Execute COMMAND with passed DIR(s) expanded into the files they contain and
+${fileMarker:+either }appended${fileMarker:+ or replacing any $fileMarker marker} inside COMMANDLINE.
+(FILE(s) (and non-existing DIR(s)) are passed along, too.)
+Just prints the resulting files without COMMAND.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --recursive|-r	Also expand subdirectories of DIR(s), and so on. By
+			default, subdirs are dropped and only the files directly
+			inside DIR are passed along.
+    --command|-c CMD	Execute CMD as a command-line. Files ${fileMarker:+either }are appended${fileMarker:+
+			or replace any $fileMarker marker} inside COMMANDLINE.
+    --exec COMMAND [...] ;
+			Execute COMMAND; all following arguments are taken to be
+			arguments to the COMMAND until an argument consisting of
+			';' is encountered. Files ${fileMarker:+either }are appended${fileMarker:+ or replace
+			any $fileMarker marker} inside COMMANDLINE.
+EXIT STATUS:
+    0	Complete success.
+    2	Bad invocation, wrong or missing command-line arguments.
+    99	Only empty DIR(s); therefore no resulting files; nothing executed.
+    *   any exit status from COMMAND(s)
+HELPTEXT
+}
+
+glob='*'
+typeset -a commands=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--recursive|-r)	shift; glob='**';;
+	--command|-c)	shift; commands+=(${commands:+;} "$1"); shift;;
+	--exec)		shift
+			cmd=
+			printf -v escapedFileMarker %q "$fileMarker"
+			while [ $# -gt 0 -a "$1" != ';' ]
+			do
+			    printf -v quotedArg '%q' "$1"
+			    cmd="${cmd}${cmd:+ }${quotedArg//"$escapedFileMarker"/$fileMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
+			    shift
+			done
+			if [ $# -eq 0 ]; then
+			    echo 'ERROR: --exec command must be concluded with ;!'; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			shift
+			commands+=(${commands:+;} "$cmd")
+			;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -eq 0 ]; then
+    echo 'ERROR: No DIR|FILE(s) passed.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
+[ ${#commands[@]} -gt 0 ] || commands=(echonl)
+
+typeset -a files=()
+for arg
+do
+    if [ -d "$arg" ]; then
+	eval "for file in \"\${arg%/}\"/${glob}
+	do
+	    [ -d \"\$file\" ] || files+=(\"\$file\")
+	done"
+    else
+	files+=("$arg")
+    fi
+done
+
+[ ${#files[@]} -gt 0 ] || exit 99
+
+printf -v quotedFiles '%q ' "${files[@]}"; quotedFiles="${quotedFiles% }"
+typeset -a interpolatedCommands=("${commands[@]//"$fileMarker"/$quotedFiles}")
+[ "${interpolatedCommands[*]}" = "${commands[*]}" ] && interpolatedCommands+=("$quotedFiles")
+
+eval "${interpolatedCommands[@]}"
