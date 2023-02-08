@@ -43,6 +43,10 @@ HELPDESCRIPTION
 			arguments to the COMMAND until an argument consisting of
 			';' is encountered. Files ${fileMarker:+either }are appended${fileMarker:+ or replace
 			any $fileMarker marker} inside COMMANDLINE.
+SEE ALSO:
+- reduceContents builds on top of this to pass the files or pipe their contents
+  through COMMAND and in the former case then processes that output once again.
+
 EXIT STATUS:
     0	Complete success.
     2	Bad invocation, wrong or missing command-line arguments.
