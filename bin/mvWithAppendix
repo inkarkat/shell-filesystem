@@ -1,0 +1,61 @@
+#!/bin/bash
+shopt -qs extglob
+
+printUsage()
+{
+    cat <<HELPTEXT
+Move files while adding APPENDIX at the end of each FILENAME (but before any
+file extension(s)).
+HELPTEXT
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '-a|--appendix APPENDIX [<mv-args> ...] SOURCE [...] DIRECTORY [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[...] -t|--target-directory DIRECTORY SOURCE [...]]'
+}
+
+appendix=
+targetDirectory=
+typeset -a mvArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--appendix|-a)	shift; appendix="${1:?}"; shift;;
+
+	-+([bfinuvZ]))	mvArgs+=("$1"); shift;;
+	--@(force|interactive|no-clobber|update|verbose|context))
+			mvArgs+=("$1"); shift;;
+	-S)		mvArgs+=("$1" "$2"); shift; shift;;
+	--backup=*)	mvArgs+=("$1"); shift;;
+	--backup)	mvArgs+=("$1" "$2"); shift; shift;;
+	--target-directory=*)
+			targetDirectory="${1#*=}"; shift;;
+	--target-directory|-t)
+			shift; targetDirectory="$1"; shift;;
+	--)		shift; break;;
+	*)		break;;
+    esac
+done
+if [ -z "$targetDirectory" ]; then
+    if [ $# -lt 2 ]; then
+	printUsage "$0" >&2
+	exit 2
+    fi
+    targetDirectory="${!#}"
+    set -- "${@:1:$(($#-1))}"
+elif [ $# -lt 1 ]; then
+    printUsage "$0" >&2
+    exit 2
+elif [ -z "$appendix" ]; then
+    echo 'ERROR: No APPENDIX passed.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
+
+status=0
+for filespec
+do
+    appendedFilename="$(fileExtension --basename --splice "$appendix" -- "$filespec")"
+    mv "${mvArgs[@]}" --no-target-directory -- "$filespec" "${targetDirectory}/${appendedFilename}" || status=$?
+done
+exit $status
