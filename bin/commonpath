@@ -5,6 +5,7 @@ printUsage()
 {
     cat <<HELPTEXT
 Print the directory that is common to all passed FILESPECs.
+Fails if there's no common path (i.e. only / is common).
 HELPTEXT
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '[--] FILESPEC [...] [-?|-h|--help]'
