@@ -17,7 +17,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--name NAME [--archive-program "zip -9 -r" --archive-extension .zip] [-C|--on-conflict increment|error|overwrite|update] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-p|--parents] [--delete-original] [--] FILE [...] [--help|-h|-?]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-1|--each|-a|--archive] -n|--name NAME [--archive-program "zip -9 -r" --archive-extension .zip] [-C|--on-conflict increment|error|overwrite|update] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-p|--parents] [--delete-original] [--] FILE [...] [--help|-h|-?]'
     echo
     printf 'Usage: backupFilespec=$(%q %s)\n' "$(basename "$1")" '[...] [--] FILE [...]'
 }
@@ -33,14 +33,18 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Write backup of FILE as NAME${NAMEDBACKUP_FILE_SEPARATOR}FILE (in FILE's directory); directories
-will be zipped (individually) into an archive file. This zip file will only
-contain the directory itself at its top level.
+Write backup of FILE(s) as a zipped archive file (or named copy in case of a
+single FILE).
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
+    --each|-1		Backup each FILE (and DIR) separately. Files will be
+			copied to "NAME${NAMEDBACKUP_FILE_SEPARATOR}FILE" (in FILE's directory);
+			directories will be archived.
+    --archive|-a	Also archive a single passed FILE instead of just
+			copying it.
     --name|-n NAME	The name of the backup [archive].
     --archive-program ARCHIVER-COMMAND
 			Use a different archive program; e.g. you could use
@@ -79,6 +83,8 @@ EXIT STATUS:
 HELPTEXT
 }
 
+isArchiveSingle=
+isEach=
 baseDir=
 name=
 archiveProgram='zip -9 -r'
@@ -91,6 +97,8 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--each|-1)	shift; isEach=t;;
+	--archive|-a)	shift; isArchiveSingle=t;;
 	--basedir)	shift; baseDir="$1"; shift;;
 	--base-type)	shift
 			case "$1" in
@@ -136,6 +144,8 @@ if [ $# -eq 0 ]; then
     exit 2
 elif [ -z "$name" ]; then
     echo 'ERROR: No -n|--name NAME passed.'
+    echo
+    printUsage "$0"
     exit 2
 fi >&2
 
@@ -190,14 +200,16 @@ printBackupFile()
 
 archiveAndBackup()
 {
-    local -r dirspec="${1%/}"
-    local -r baseDirspec="$(dirname -- "$dirspec")"
-    local -r archiveDirBasename="$(basename -- "$dirspec")"
+    typeset -a filespecs=(); readarray -t filespecs < <(readlink --canonicalize -- "$@")
+    local baseDirspec="$(commonpath -- "${filespecs[@]}" || printf /)"
+    baseDirspec="${baseDirspec%/}/"
+
+    typeset -a archivedFiles=("${filespecs[@]#$baseDirspec}")
 
     local status=0 backupFilespec forceArg='' counter=''
     while :
     do
-	backupFilespec="$(readlink -nf -- "${backupDirspec:-$(dirname -- "$spec")}${name}${counter:+ (${counter})}${archiveExtension}")" || status=$?
+	backupFilespec="$(readlink -nf -- "${backupDirspec:-$baseDirspec}${name}${counter:+ (${counter})}${archiveExtension}")" || status=$?
 	[ -n "$backupFilespec" ] || return $status
 
 	if [ -r "$backupFilespec" ]; then
@@ -220,7 +232,7 @@ archiveAndBackup()
     fi
 
     pushd "${baseDirspec}" >/dev/null && \
-	eval "${archiveProgram}" '"${backupFilespec}" "${archiveDirBasename}/"' "$archiveRedirect" && {
+	eval "${archiveProgram}" '"${backupFilespec}" "${archivedFiles[@]}"' "$archiveRedirect" && {
 	    printBackupFile "${backupDirspec:-${baseDirspec}/}${name}${counter:+ (${counter})}${archiveExtension}"
 	    popd >/dev/null || :
 	} || {
@@ -232,69 +244,70 @@ archiveAndBackup()
 
 writebackup()
 {
-    local -r spec="$1"
-
-    if [ -f "$spec" ]; then
-	if [ ! -r "$spec" ]; then
-	    printf >&2 "ERROR: '%s' is not readable.\\n" "$spec"
-	    return 1
-	fi
-
-	local -r basename="$(basename -- "$spec")"
-	local backupFilespec forceArg='' counter=''
-	while :
+    if [ -f "$1" ] && { [ "$isEach" ] || [ $# -eq 1 -a ! "$isArchiveSingle" ]; }; then
+	local spec isSuccess= isFailure=; for spec
 	do
-	    local backupFilespec="${backupDirspec:-$(dirname -- "$spec")}${name}${counter:+ (${counter})}${NAMEDBACKUP_FILE_SEPARATOR}${basename}"
+	    if [ ! -r "$spec" ]; then
+		printf >&2 "ERROR: '%s' is not readable.\\n" "$spec"
+		isFailure=t
+	    fi
 
-	    if [ -r "$backupFilespec" ]; then
-		$onConflict ''
-		case $? in
-		    0)  break;;
-		    2)  continue;;
-		    *)  return 1;;
-		esac
-	    else
-		break
+	    local -r basename="$(basename -- "$spec")"
+	    local backupFilespec forceArg='' counter=''
+	    while :
+	    do
+		local backupFilespec="${backupDirspec:-$(dirname -- "$spec")}${name}${counter:+ (${counter})}${NAMEDBACKUP_FILE_SEPARATOR}${basename}"
+
+		if [ -r "$backupFilespec" ]; then
+		    $onConflict ''
+		    case $? in
+			0)  break;;
+			2)  continue;;
+			*)  isFailure=t;;
+		    esac
+		else
+		    break
+		fi
+	    done
+
+	    umask 0111	# Drop the execute permission on the backup.
+	    cp $forceArg -- "$spec" "$backupFilespec" && isSuccess=t || isFailure=t
+	    printBackupFile "$backupFilespec"
+
+	    if [ "$isDeleteOriginal" ]; then
+		rm --force -- "$spec" || isFailure=t
+		[ ! -t 1 ] || printf 'Deleted original %s\n' "$spec"
 	    fi
 	done
 
-	umask 0111	# Drop the execute permission on the backup.
-	cp $forceArg -- "$spec" "$backupFilespec" || return 1
-	printBackupFile "$backupFilespec"
-
-	if [ "$isDeleteOriginal" ]; then
-	    rm --force -- "$spec" || return 1
-	    [ ! -t 1 ] || printf 'Deleted original %s\n' "$spec"
-	fi
-
-	return 0
-    elif [ -d "$spec" ]; then
-	if [ ! -r "$spec" -o ! -x "$spec" ]; then
-	    printf >&2 "ERROR: '%s' is not accessible.\\n" "$spec"
-	    return 1
-	fi
-	archiveAndBackup "$spec" || return 1
-
-	if [ "$isDeleteOriginal" ]; then
-	    rm --force --recursive -- "$spec" || return 1
-	    [ ! -t 1 ] || printf 'Deleted original %s\n' "$spec"
+	if [ "$isFailure" ]; then
+	    [ "$isSuccess" ] && return 6 || return 1
 	fi
     else
-	printf >&2 "ERROR: '%s' does not exist.\\n" "$spec"
-	return 1
+	archiveAndBackup "$@" || return $?
+
+	if [ "$isDeleteOriginal" ]; then
+	    rm --force --recursive -- "$@" || return 1
+	    [ ! -t 1 ] || printf 'Deleted original %s\n' "$@"
+	fi
     fi
 }
 
 
-isSuccess=
-isFailure=
 
-while [ $# -ne 0 ]
-do
-    writebackup "$1" && isSuccess=t || isFailure=t
-    shift
-done
+if [ "$isEach" ]; then
+    isSuccess=
+    isFailure=
 
-if [ "$isFailure" ]; then
-    [ "$isSuccess" ] && exit 6 || exit 1
+    for filespec
+    do
+	writebackup "$filespec" && isSuccess=t || isFailure=t
+	shift
+    done
+
+    if [ "$isFailure" ]; then
+	[ "$isSuccess" ] && exit 6 || exit 1
+    fi
+else
+    writebackup "$@"
 fi
