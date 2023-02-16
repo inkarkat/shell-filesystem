@@ -17,7 +17,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--name NAME [--archive-program "zip -9 -r" --archive-extension .zip] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-p|--parents] [--delete-original] [--] FILE [...] [--help|-h|-?]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--name NAME [--archive-program "zip -9 -r" --archive-extension .zip] [-C|--on-conflict increment|error|overwrite|update] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-p|--parents] [--delete-original] [--] FILE [...] [--help|-h|-?]'
     echo
     printf 'Usage: backupFilespec=$(%q %s)\n' "$(basename "$1")" '[...] [--] FILE [...]'
 }
@@ -49,6 +49,16 @@ HELPDESCRIPTION
 			    --archive-extension .tar
     --archive-extension EXT
 			Configure the archive extension for a custom archiver.
+    --on-conflict|-C increment|error|overwrite|update
+			Behavior when the backup already exists:
+			    increment:	Append or increment a (1) to the NAME to
+					create a non-existing backup filespec.
+					(This is the default.)
+			    error:	Don't create a backup.
+			    overwrite:	Delete the existing backup.
+			    update:	Update existing files and add new ones
+					to the archive. For single FILEs the
+					same as overwrite.
     --basedir BASEDIR	Prepend BASEDIR in front of DIR / NAME (unless DIR is
 			absolute).
     --base-type config|data|runtime|cache|temp
@@ -72,6 +82,7 @@ baseDir=
 name=
 archiveProgram='zip -9 -r'
 archiveExtension='.zip'
+onConflict=increment
 backupDir=
 isMakeParents=
 isDeleteOriginal=
@@ -100,6 +111,8 @@ do
 			shift; archiveProgram="$1"; shift;;
 	--archive-extension)
 			shift; archiveExtension="$1"; shift;;
+	--on-conflict|-C)
+			shift; onConflict="$1"; shift;;
 	--backup-dir|-d)
 			if [ -z "$2" ]; then
 			    { echo "ERROR: Must pass directory after ${1}!"; echo; printUsage "$0"; } >&2
@@ -139,6 +152,31 @@ if [ -n "$backupDirspec" -a ! -d "$backupDirspec" ]; then
     fi
 fi
 
+increment()
+{
+    let counter+=1
+    return 2
+}
+error()
+{
+    printf >&2 "ERROR: Backup file '%s' already exists.\\n" "$backupFilespec"
+    return 1
+}
+overwrite()
+{
+    if [ "$1" ]; then
+	# Prevent zip from updating the existing archive contents.
+	rm --force -- "$backupFilespec"
+    else
+	forceArg=--force
+    fi
+}
+update()
+{
+    forceArg=--force
+}
+
+
 printBackupFile()
 {
     local filespec="${1:?}"; shift
@@ -155,13 +193,23 @@ archiveAndBackup()
     local -r baseDirspec="$(dirname -- "$dirspec")"
     local -r archiveDirBasename="$(basename -- "$dirspec")"
 
-    local status=0 backupFilespec
-    if [ -n "$backupDirspec" ]; then
-	backupFilespec="$(readlink -nf -- "${backupDirspec}${name}${archiveExtension}")" || status=$?
-    else
-	backupFilespec="${name}${archiveExtension}"
-    fi
-    [ -n "$backupFilespec" ] || return $status
+    local status=0 backupFilespec forceArg='' counter=''
+    while :
+    do
+	backupFilespec="$(readlink -nf -- "${backupDirspec:-$(dirname -- "$spec")}${name}${counter:+ (${counter})}${archiveExtension}")" || status=$?
+	[ -n "$backupFilespec" ] || return $status
+
+	if [ -r "$backupFilespec" ]; then
+	    $onConflict t
+	    case $? in
+		0)  break;;
+		2)  continue;;
+		*)  return 1;;
+	    esac
+	else
+	    break
+	fi
+    done
 
     local archiveRedirect
     if [ -t 1 ]; then
@@ -169,10 +217,10 @@ archiveAndBackup()
     else
 	archiveRedirect='>/dev/null'
     fi
-    set -x
+
     pushd "${baseDirspec}" >/dev/null && \
 	eval "${archiveProgram}" '"${backupFilespec}" "${archiveDirBasename}/"' "$archiveRedirect" && {
-	    printBackupFile "${backupDirspec:-${baseDirspec}/}${name}${archiveExtension}"
+	    printBackupFile "${backupDirspec:-${baseDirspec}/}${counter:+ (${counter})}${name}${archiveExtension}"
 	    popd >/dev/null || :
 	} || {
 	    echo >&2 'ERROR: Could not create archive.'
@@ -192,12 +240,25 @@ writebackup()
 	fi
 
 	local -r basename="$(basename -- "$spec")"
-	[ -n "$backupDirspec" ] \
-	    && local -r backupFilespec="${backupDirspec}${name}${NAMEDBACKUP_FILE_SEPARATOR}${basename}" \
-	    || local -r backupFilespec="$(dirname -- "$spec")/${name}${NAMEDBACKUP_FILE_SEPARATOR}${basename}"
+	local backupFilespec forceArg='' counter=''
+	while :
+	do
+	    local backupFilespec="${backupDirspec:-$(dirname -- "$spec")}${name}${counter:+ (${counter})}${NAMEDBACKUP_FILE_SEPARATOR}${basename}"
+
+	    if [ -r "$backupFilespec" ]; then
+		$onConflict ''
+		case $? in
+		    0)  break;;
+		    2)  continue;;
+		    *)  return 1;;
+		esac
+	    else
+		break
+	    fi
+	done
 
 	umask 0111	# Drop the execute permission on the backup.
-	cp -- "$spec" "$backupFilespec" || return 1
+	cp $forceArg -- "$spec" "$backupFilespec" || return 1
 	printBackupFile "$backupFilespec"
 
 	if [ "$isDeleteOriginal" ]; then
