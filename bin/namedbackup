@@ -1,0 +1,238 @@
+#!/bin/bash
+###############################################################################
+##
+# FILE:		namedbackup
+# PRODUCT:	shell-filesystem
+# AUTHOR:	Ingo Karkat <ingo@karkat.de>
+# DATE CREATED:	16-Feb-2023
+#
+###############################################################################
+#
+# DEPENDENCIES:
+#   - cp, readlink, zip (or other archive tool)
+#
+###############################################################################
+
+: ${NAMEDBACKUP_FILE_SEPARATOR= - }
+
+printShortUsage()
+{
+    printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--name NAME [--archive-program "zip -9 -r" --archive-extension .zip] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-p|--parents] [--delete-original] [--] FILE [...] [--help|-h|-?]'
+    echo
+    printf 'Usage: backupFilespec=$(%q %s)\n' "$(basename "$1")" '[...] [--] FILE [...]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf '\nTry %q %s\n' "$(basename "$1")" '--help for more information.'
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Write backup of FILE as NAME${NAMEDBACKUP_FILE_SEPARATOR}FILE (in FILE's directory); directories
+will be zipped (individually) into an archive file. This zip file will only
+contain the directory itself at its top level.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --name|-n NAME	The name of the backup [archive].
+    --archive-program ARCHIVER-COMMAND
+			Use a different archive program; e.g. you could use
+			'tar' instead of 'zip' by specifying
+			    --archive-program "tar cvf"
+			    --archive-extension .tar
+    --archive-extension EXT
+			Configure the archive extension for a custom archiver.
+    --basedir BASEDIR	Prepend BASEDIR in front of DIR / NAME (unless DIR is
+			absolute).
+    --base-type config|data|runtime|cache|temp
+			Set the base directory to prepend based on the passed
+			characterization.
+    --backup-dir|-d DIR	Create backups in DIR instead of in the same directory
+			as the original FILE.
+    --parents|-p	Make parent directories for the backup destination as
+			needed.
+    --delete-original	Removes the original FILE; you can use this for a final
+			backup before getting rid of FILE.
+EXIT STATUS:
+    0	Complete success.
+    1	Failed to backup any FILE(s).
+    2	Partial success; some FILE(s) could not be backed up.
+    3	Bad invocation, wrong or missing command-line arguments.
+HELPTEXT
+}
+
+baseDir=
+name=
+archiveProgram='zip -9 -r'
+archiveExtension='.zip'
+backupDir=
+isMakeParents=
+isDeleteOriginal=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--basedir)	shift; baseDir="$1"; shift;;
+	--base-type)	shift
+			case "$1" in
+			    config)	baseDir="${XDG_CONFIG_HOME:-$HOME/.config}";;
+			    data)	baseDir="${XDG_DATA_HOME:-$HOME/.local/share}";;
+			    runtime)	baseDir="${XDG_RUNTIME_DIR:-/run/user/$UID}";;
+			    cache)	baseDir="${XDG_CACHE_HOME:-$HOME/.cache}";;
+			    temp)	baseDir="${TMPDIR:-/tmp}";;
+			    *)		printf >&2 'ERROR: Invalid base-type "%s".\n' "$1"
+					echo >&2
+					printUsage "$0" >&2
+					exit 2
+					;;
+			esac
+			shift
+			;;
+	--name|-n)	shift; name="${1:?}"; shift;;
+	--archive-program)
+			shift; archiveProgram="$1"; shift;;
+	--archive-extension)
+			shift; archiveExtension="$1"; shift;;
+	--backup-dir|-d)
+			if [ -z "$2" ]; then
+			    { echo "ERROR: Must pass directory after ${1}!"; echo; printUsage "$0"; } >&2
+			    exit 3
+			fi
+			shift
+			backupDir="${1%/}/"
+			shift
+			;;
+	--parents|-p)	shift; isMakeParents=t;;
+	--delete-original)
+			shift; isDeleteOriginal=t;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 3;;
+	*)		break;;
+    esac
+done
+if [ $# -eq 0 ]; then
+    printUsage "$0"
+    exit 3
+elif [ -z "$name" ]; then
+    echo 'ERROR: No -n|--name NAME passed.'
+    exit 2
+fi >&2
+
+if [[ "$backupDir" =~ ^/ ]]; then
+    backupDirspec="${backupDir%/}/"
+else
+    backupDirspec="${baseDir%/}${baseDir:+/}${backupDir%/}${backupDir:+/}"
+fi
+if [ -n "$backupDirspec" -a ! -d "$backupDirspec" ]; then
+    if [ "$isMakeParents" ]; then
+	mkdir --parents -- "$backupDirspec" || exit 3
+    else
+	printf 'ERROR: Backup dir does not exist: "%s".\n' "${backupDir%/}"
+	exit 3
+    fi
+fi
+
+printBackupFile()
+{
+    local filespec="${1:?}"; shift
+    # When output is not to the terminal, just print the complete backup
+    # filespec. Other applications may use command substitution to obtain
+    # it.
+    local message; [ -t 1 ] && message='Backed up to'
+    printf '%s%s\n' "${message}${message:+ }" "$filespec"
+}
+
+archiveAndBackup()
+{
+    local -r dirspec="${1%/}"
+    local -r baseDirspec="$(dirname -- "$dirspec")"
+    local -r archiveDirBasename="$(basename -- "$dirspec")"
+
+    local status=0 backupFilespec
+    if [ -n "$backupDirspec" ]; then
+	backupFilespec="$(readlink -nf -- "${backupDirspec}${name}${archiveExtension}")" || status=$?
+    else
+	backupFilespec="${name}${archiveExtension}"
+    fi
+    [ -n "$backupFilespec" ] || return $status
+
+    local archiveRedirect
+    if [ -t 1 ]; then
+	printf 'Archiving %s...\n' "$dirspec"
+    else
+	archiveRedirect='>/dev/null'
+    fi
+    set -x
+    pushd "${baseDirspec}" >/dev/null && \
+	eval "${archiveProgram}" '"${backupFilespec}" "${archiveDirBasename}/"' "$archiveRedirect" && {
+	    printBackupFile "${backupDirspec:-${baseDirspec}/}${name}${archiveExtension}"
+	    popd >/dev/null || :
+	} || {
+	    echo >&2 'ERROR: Could not create archive.'
+	    popd >/dev/null || :
+	    return 1
+	}
+}
+
+writebackup()
+{
+    local -r spec="$1"
+
+    if [ -f "$spec" ]; then
+	if [ ! -r "$spec" ]; then
+	    printf >&2 "ERROR: '%s' is not readable.\\n" "$spec"
+	    return 1
+	fi
+
+	local -r basename="$(basename -- "$spec")"
+	[ -n "$backupDirspec" ] \
+	    && local -r backupFilespec="${backupDirspec}${name}${NAMEDBACKUP_FILE_SEPARATOR}${basename}" \
+	    || local -r backupFilespec="$(dirname -- "$spec")/${name}${NAMEDBACKUP_FILE_SEPARATOR}${basename}"
+
+	umask 0111	# Drop the execute permission on the backup.
+	cp -- "$spec" "$backupFilespec" || return 1
+	printBackupFile "$backupFilespec"
+
+	if [ "$isDeleteOriginal" ]; then
+	    rm --force -- "$spec" || return 1
+	    [ ! -t 1 ] || printf 'Deleted original %s\n' "$spec"
+	fi
+
+	return 0
+    elif [ -d "$spec" ]; then
+	if [ ! -r "$spec" -o ! -x "$spec" ]; then
+	    printf >&2 "ERROR: '%s' is not accessible.\\n" "$spec"
+	    return 1
+	fi
+	archiveAndBackup "$spec" || return 1
+
+	if [ "$isDeleteOriginal" ]; then
+	    rm --force --recursive -- "$spec" || return 1
+	    [ ! -t 1 ] || printf 'Deleted original %s\n' "$spec"
+	fi
+    else
+	printf >&2 "ERROR: '%s' does not exist.\\n" "$spec"
+	return 1
+    fi
+}
+
+
+isSuccess=
+isFailure=
+
+while [ $# -ne 0 ]
+do
+    writebackup "$1" && isSuccess=t || isFailure=t
+    shift
+done
+
+if [ "$isFailure" ]; then
+    [ "$isSuccess" ] && exit 2 || exit 1
+fi
