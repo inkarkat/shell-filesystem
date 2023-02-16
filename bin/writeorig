@@ -36,7 +36,7 @@ HELPDESCRIPTION
     --keep|-k			Do nothing if the backup already exists
 				(default behavior), and succeed instead.
     --backup-dir|-d DIR		Create backups in DIR instead of in the same
-				directory as the original file.
+				directory as the original FILE.
     --delete-original		Removes the original FILE after creating
 				FILE.${WRITEORIG_EXT}; you can use this for a final backup
 				before getting rid of the FILE.
@@ -49,7 +49,7 @@ HELPDESCRIPTION
     --accept-nonexisting	Do not print an error if FILE does not exist,
 				but simply print the would-be backup extension.
 				Useful for direct-backup use cases where there's
-				either no original file or it is located
+				either no original FILE or it is located
 				somewhere else. If you'd rather not create a
 				backup if FILE does not exist yet, just
 				suppress stderr and use the empty output (e.g.
