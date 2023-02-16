@@ -73,8 +73,9 @@ HELPDESCRIPTION
 EXIT STATUS:
     0	Complete success.
     1	Failed to backup any FILE(s).
-    2	Partial success; some FILE(s) could not be backed up.
-    3	Bad invocation, wrong or missing command-line arguments.
+    2   Bad invocation, wrong or missing command-line arguments
+    3	Internal error or failed assertion.
+    6	Partial success; some FILE(s) could not be backed up.
 HELPTEXT
 }
 
@@ -116,7 +117,7 @@ do
 	--backup-dir|-d)
 			if [ -z "$2" ]; then
 			    { echo "ERROR: Must pass directory after ${1}!"; echo; printUsage "$0"; } >&2
-			    exit 3
+			    exit 2
 			fi
 			shift
 			backupDir="${1%/}/"
@@ -126,13 +127,13 @@ do
 	--delete-original)
 			shift; isDeleteOriginal=t;;
 	--)		shift; break;;
-	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 3;;
+	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
     esac
 done
 if [ $# -eq 0 ]; then
     printUsage "$0"
-    exit 3
+    exit 2
 elif [ -z "$name" ]; then
     echo 'ERROR: No -n|--name NAME passed.'
     exit 2
@@ -148,7 +149,7 @@ if [ -n "$backupDirspec" -a ! -d "$backupDirspec" ]; then
 	mkdir --parents -- "$backupDirspec" || exit 3
     else
 	printf 'ERROR: Backup dir does not exist: "%s".\n' "${backupDir%/}"
-	exit 3
+	exit 2
     fi
 fi
 
@@ -295,5 +296,5 @@ do
 done
 
 if [ "$isFailure" ]; then
-    [ "$isSuccess" ] && exit 2 || exit 1
+    [ "$isSuccess" ] && exit 6 || exit 1
 fi
