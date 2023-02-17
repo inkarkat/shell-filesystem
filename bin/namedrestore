@@ -18,7 +18,7 @@ shopt -qs nullglob
 
 printShortUsage()
 {
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-t|--to DIRSPEC] [-f|--force|-i|--interactive|-n|--no-clobber] [--archive-program "unzip" --archive-extension .zip] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [--delete-backup] [--] BACKUP-NAME|BACKUP-FILE [...] [--help|-h|-?]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-t|--to DIRSPEC] [-f|--force|-i|--interactive|-n|--no-clobber] [--archive-program "unzip" [--archive-extension .zip] [--archive-flag-force FLAG] [--archive-flag-interactive FLAG] [--archive-flag-no-clobber FLAG]] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [--delete-backup] [--] BACKUP-NAME|BACKUP-FILE [...] [--help|-h|-?]'
 }
 printUsage()
 {
@@ -75,6 +75,7 @@ overwritePolicy=interactive
 baseDir=
 archiveProgram='unzip'
 archiveExtension='.zip'
+typeset -A archiveFlag=([force]='-o' [interactive]='' [no-clobber]='-n')
 backupDir=
 isDeleteBackup=
 while [ $# -ne 0 ]
@@ -107,6 +108,12 @@ do
 			shift; archiveProgram="$1"; shift;;
 	--archive-extension)
 			shift; archiveExtension="$1"; shift;;
+	--archive-flag-force)
+			shift; archiveFlag[force]="$1"; shift;;
+	--archive-flag-interactive)
+			shift; archiveFlag[interactive]="$1"; shift;;
+	--archive-flag-no-clobber)
+			shift; archiveFlag[no-clobber]="$1"; shift;;
 	--backup-dir|-d)
 			if [ -z "$2" ]; then
 			    { echo "ERROR: Must pass directory after ${1}!"; echo; printUsage "$0"; } >&2
@@ -138,9 +145,32 @@ if [ -n "$backupDirspec" -a ! -d "$backupDirspec" ]; then
     exit 2
 fi
 
+extractArchive()
+{
+    local filespec="${1:?}"; shift
+    printf 'Restoring %s...\n' "$filespec"
+    if ! eval "$archiveProgram ${archiveFlag[$overwritePolicy]}" '"$filespec"'; then
+	printf >&2 'ERROR: Could not restore archive: %s\n' "$filespec"
+	return 1
+    fi
+}
+
 restoreArchive()
 {
     local filespec="${1:?}"; shift
+    if [ -n "$targetDirspec" -a "$targetDirspec" != '.' ]; then
+	filespec="$(readlink -nf -- "$filespec")" || return $?
+	(
+	    cd "$targetDirspec" || exit 1
+	    extractArchive "$filespec"
+	)
+    else
+	extractArchive "$filespec"
+    fi || return 1
+
+    if [ "$isDeleteBackup" ]; then
+	rm --force -- "$filespec"
+    fi
 }
 
 restoreFile()
