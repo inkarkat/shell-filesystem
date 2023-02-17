@@ -17,7 +17,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-1|--each|-a|--archive] -n|--name NAME [--archive-program "zip -9 -r" --archive-extension .zip] [-C|--on-conflict ask|increment|error|overwrite|update] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-p|--parents] [--delete-original] [--] FILE [...] [--help|-h|-?]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-1|--each|-a|--archive] -n|--name NAME [--archive-program "zip -9 -r" --archive-extension .zip] [-C|--on-conflict ask|increment|error|overwrite|update] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-p|--parents] [-D|--delete-original] [--] FILE [...] [--help|-h|-?]'
     echo
     printf 'Usage: backupFilespec=$(%q %s)\n' "$(basename "$1")" '[...] [--] FILE [...]'
 }
@@ -73,7 +73,8 @@ HELPDESCRIPTION
 			as the original FILE.
     --parents|-p	Make parent directories for the backup destination as
 			needed.
-    --delete-original	Removes the original FILE; you can use this for a final
+    --delete-original|-D
+			Removes the original FILE; you can use this for a final
 			backup before getting rid of FILE.
 EXIT STATUS:
     0	Complete success.
@@ -133,7 +134,7 @@ do
 			shift
 			;;
 	--parents|-p)	shift; isMakeParents=t;;
-	--delete-original)
+	--delete-original|-D)
 			shift; isDeleteOriginal=t;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 2;;

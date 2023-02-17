@@ -18,7 +18,7 @@ shopt -qs nullglob
 
 printShortUsage()
 {
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-t|--to DIRSPEC [-p|--parents]] [-C|--clobber|-f|--force|-i|--interactive|-n|--no-clobber] [--archive-program "unzip" [--archive-extension .zip] [--archive-flag-list FLAG] [--archive-flag-force FLAG] [--archive-flag-interactive FLAG] [--archive-flag-no-clobber FLAG]] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [--delete-backup] [--] BACKUP-NAME|BACKUP-FILE [...] [--help|-h|-?]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-t|--to DIRSPEC [-p|--parents]] [-C|--clobber|-f|--force|-i|--interactive|-n|--no-clobber] [--archive-program "unzip" [--archive-extension .zip] [--archive-flag-list FLAG] [--archive-flag-force FLAG] [--archive-flag-interactive FLAG] [--archive-flag-no-clobber FLAG]] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-D|--delete-backup] [--] BACKUP-NAME|BACKUP-FILE [...] [--help|-h|-?]'
 }
 printUsage()
 {
@@ -66,7 +66,7 @@ HELPDESCRIPTION
 			characterization.
     --backup-dir|-d DIR	Create backups in DIR instead of in the same directory
 			as the original FILE.
-    --delete-backup	Removes the original BACKUP-FILE after successfully
+    --delete-backup|-D	Removes the original BACKUP-FILE after successfully
 			restoring it.
 EXIT STATUS:
     0	Complete success.
@@ -137,7 +137,7 @@ do
 			backupDir="${1%/}/"
 			shift
 			;;
-	--delete-backup)
+	--delete-backup|-D)
 			shift; isDeleteBackup=t;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 2;;
