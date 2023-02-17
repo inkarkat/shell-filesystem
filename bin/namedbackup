@@ -239,7 +239,7 @@ archiveAndBackup()
     fi
 
     (
-	cd "${baseDirspec}" || return 1
+	cd "${baseDirspec}" || exit 1
 	if eval "${archiveProgram}" '"${backupFilespec}" "${archivedFiles[@]}"' "$archiveRedirect"; then
 	    printBackupFile "${backupDirspec:-${baseDirspec}/}${name}${counter:+ (${counter})}${archiveExtension}"
 	else
