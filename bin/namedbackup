@@ -247,7 +247,7 @@ archiveAndBackup()
 	}
 }
 
-writebackup()
+doBackup()
 {
     if [ -f "$1" ] && { [ "$isEach" ] || [ $# -eq 1 -a ! "$isArchiveSingle" ]; }; then
 	local spec isSuccess= isFailure=; for spec
@@ -306,13 +306,12 @@ if [ "$isEach" ]; then
 
     for filespec
     do
-	writebackup "$filespec" && isSuccess=t || isFailure=t
-	shift
+	doBackup "$filespec" && isSuccess=t || isFailure=t
     done
 
     if [ "$isFailure" ]; then
 	[ "$isSuccess" ] && exit 6 || exit 1
     fi
 else
-    writebackup "$@"
+    doBackup "$@"
 fi
