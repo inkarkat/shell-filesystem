@@ -159,7 +159,7 @@ if [ -n "$backupDirspec" -a ! -d "$backupDirspec" ]; then
     if [ "$isMakeParents" ]; then
 	mkdir --parents -- "$backupDirspec" || exit 3
     else
-	printf 'ERROR: Backup dir does not exist: "%s".\n' "${backupDir%/}"
+	printf 'ERROR: Backup dir does not exist: "%s".\n' "${backupDirspec%/}"
 	exit 2
     fi
 fi
@@ -231,7 +231,8 @@ archiveAndBackup()
 
     local archiveRedirect
     if [ -t 1 ]; then
-	printf 'Archiving %s...\n' "$dirspec"
+	archivedFilesPlural=s; [ ${#archivedFiles[@]} -eq 1 ] && archivedFilesPlural=
+	printf 'Archiving %d file%s inside %s...\n' ${#archivedFiles[@]} "$archivedFilesPlural" "$baseDirspec"
     else
 	archiveRedirect='>/dev/null'
     fi
