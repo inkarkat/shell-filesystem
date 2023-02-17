@@ -1,0 +1,194 @@
+#!/bin/bash
+###############################################################################
+##
+# FILE:		namedrestore
+# PRODUCT:	shell-filesystem
+# AUTHOR:	Ingo Karkat <ingo@karkat.de>
+# DATE CREATED:	16-Feb-2023
+#
+###############################################################################
+#
+# DEPENDENCIES:
+#   - cp, readlink, unzip (or other archive tool)
+#
+###############################################################################
+shopt -qs nullglob
+
+: ${NAMEDBACKUP_FILE_SEPARATOR= - }
+
+printShortUsage()
+{
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-t|--to DIRSPEC] [-f|--force|-i|--interactive|-n|--no-clobber] [--archive-program "unzip" --archive-extension .zip] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [--delete-backup] [--] BACKUP-NAME|BACKUP-FILE [...] [--help|-h|-?]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf '\nTry %q %s\n' "$(basename "$1")" '--help for more information.'
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Restore BACKUP-FILE or BACKUP-NAME in [BASEDIR/]DIR (with or without an archive
+file extension, for single files possibly just the NAME prefix given) that is a
+zipped archive file (or named copy in case of a single FILE).
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --to|-t DIRSPEC	The target directory (by default the current working
+			dir).
+    --force|-f		Do not prompt before overwriting.
+    --interactive|-i	Prompt before overwriting. (This is the default.)
+    --no-clobber|-n	Do not overwrite an existing file.
+    --archive-program ARCHIVER-COMMAND
+			Use a different archive program; e.g. you could use
+			'tar' instead of 'zip' by specifying
+			    --archive-program "tar xvf"
+			    --archive-extension .tar
+    --archive-extension EXT
+			Configure the archive extension for a custom archiver.
+    --basedir BASEDIR	Prepend BASEDIR in front of DIR / NAME (unless DIR is
+			absolute).
+    --base-type config|data|runtime|cache|temp
+			Set the base directory to prepend based on the passed
+			characterization.
+    --backup-dir|-d DIR	Create backups in DIR instead of in the same directory
+			as the original FILE.
+    --delete-backup	Removes the original BACKUP-FILE after successfully
+			restoring it.
+EXIT STATUS:
+    0	Complete success.
+    1	Failed to restore any BACKUP-FILE(s).
+    2   Bad invocation, wrong or missing command-line arguments
+    3	Internal error or failed assertion.
+    6	Partial success; some BACKUP-FILE(s) could not be restored.
+HELPTEXT
+}
+
+targetDirspec=
+overwritePolicy=interactive
+baseDir=
+archiveProgram='unzip'
+archiveExtension='.zip'
+backupDir=
+isDeleteBackup=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--basedir)	shift; baseDir="$1"; shift;;
+	--base-type)	shift
+			case "$1" in
+			    config)	baseDir="${XDG_CONFIG_HOME:-$HOME/.config}";;
+			    data)	baseDir="${XDG_DATA_HOME:-$HOME/.local/share}";;
+			    runtime)	baseDir="${XDG_RUNTIME_DIR:-/run/user/$UID}";;
+			    cache)	baseDir="${XDG_CACHE_HOME:-$HOME/.cache}";;
+			    temp)	baseDir="${TMPDIR:-/tmp}";;
+			    *)		printf >&2 'ERROR: Invalid base-type "%s".\n' "$1"
+					echo >&2
+					printUsage "$0" >&2
+					exit 2
+					;;
+			esac
+			shift
+			;;
+	--to|-t)	shift; targetDirspec="$1"; shift;;
+	--force|-f)	shift; overwritePolicy=force;;
+	--interactive|-i)
+			shift; overwritePolicy=interactive;;
+	--no-clobber|-n)
+			shift; overwritePolicy=no-clobber;;
+	--archive-program)
+			shift; archiveProgram="$1"; shift;;
+	--archive-extension)
+			shift; archiveExtension="$1"; shift;;
+	--backup-dir|-d)
+			if [ -z "$2" ]; then
+			    { echo "ERROR: Must pass directory after ${1}!"; echo; printUsage "$0"; } >&2
+			    exit 2
+			fi
+			shift
+			backupDir="${1%/}/"
+			shift
+			;;
+	--delete-backup)
+			shift; isDeleteBackup=t;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -eq 0 ]; then
+    printUsage "$0"
+    exit 2
+fi >&2
+
+if [[ "$backupDir" =~ ^/ ]]; then
+    backupDirspec="${backupDir%/}/"
+else
+    backupDirspec="${baseDir%/}${baseDir:+/}${backupDir%/}${backupDir:+/}"
+fi
+if [ -n "$backupDirspec" -a ! -d "$backupDirspec" ]; then
+    printf 'ERROR: Backup dir does not exist: "%s".\n' "${backupDirspec%/}"
+    exit 2
+fi
+
+restoreArchive()
+{
+    local filespec="${1:?}"; shift
+}
+
+restoreFile()
+{
+    local filespec="${1:?}"; shift
+    local filename="$(basename -- "$filespec")"
+    local destination="${targetDirspec%/}${targetDirspec:+/}${filename#*$NAMEDBACKUP_FILE_SEPARATOR}"
+
+    if [ "$isDeleteBackup" ]; then
+	mv --verbose --$overwritePolicy -- "$filespec" "$destination"
+    else
+	cp --verbose --$overwritePolicy -- "$filespec" "$destination"
+    fi
+}
+
+isSuccess=
+isFailure=
+
+for arg
+do
+    for filespec in "$arg" "${backupDirspec}${arg}" "${arg}${archiveExtension}" "${backupDirspec}${arg}${archiveExtension}"
+    do
+	[ -e "$filespec" ] && break || filespec=''
+    done
+
+    if [ -z "$filespec" ]; then
+	for prefix in "$arg" "${backupDirspec}${arg}"
+	do
+	    # Handle single backed-up FILEs where just the NAME prefix is given.
+	    typeset -a filespecs=("${prefix}${NAMEDBACKUP_FILE_SEPARATOR}"*)
+	    if [ ${#filespecs[@]} -gt 0 ]; then
+		for filespec in "${filespecs[@]}"
+		do
+		    restoreFile "$filespec" && isSuccess=t || isFailure=t
+		done
+		break 2
+	    fi
+	done
+
+	printf >&2 "ERROR: Backup file '%s' does not exist.\\n" "$arg"
+	false
+    elif [[ "$filespec" =~ "$archiveExtension"$ ]]; then
+	restoreArchive "$filespec"
+    else
+	restoreFile "$filespec"
+    fi && isSuccess=t || isFailure=t
+done
+
+if [ "$isFailure" ]; then
+    [ "$isSuccess" ] && exit 6 || exit 1
+fi
