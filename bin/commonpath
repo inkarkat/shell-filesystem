@@ -5,29 +5,44 @@ printUsage()
 {
     cat <<HELPTEXT
 Print the directory that is common to all passed FILESPECs.
+Fails if there's no common path (i.e. only / is common).
 HELPTEXT
     echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[--] FILESPEC [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--canonicalize] [--] FILESPEC [...] [-?|-h|--help]'
 }
-case "$1" in
-    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-    --)			shift;;
-esac
+isCanonicalize=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--canonicalize|-f)
+			shift; isCanonicalize=t;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
 if [ $# -eq 0 ]; then
     printUsage >&2 "$0"
     exit 2
-elif [ $# -eq 1 ]; then
+fi
+if [ "$isCanonicalize" ]; then
+    readarray -t filespecs < <(readlink --canonicalize -- "$@")
+    set -- "${filespecs[@]}"
+else
+    # Remove repeated slashes.
+    for param
+    do
+	param="$(printf %s. "$1" | tr -s /)"
+	set -- "$@" "${param%.}"
+	shift
+    done
+fi
+
+if [ $# -eq 1 ]; then
     printf '%s\n' "${1%/*}"
     exit
 fi
-
-# Remove repeated slashes.
-for param
-do
-    param="$(printf %s. "$1" | tr -s /)"
-    set -- "$@" "${param%.}"
-    shift
-done
 
 common_path="$1"
 shift

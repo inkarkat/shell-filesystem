@@ -21,8 +21,8 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-If a FILE.orig backup already exists, writes subsequent backups of the current
-file with a 'current date + counter' file extension (format '.YYYYMMDD[a-z]').
+If a FILE.orig backup already exists, writes subsequent backups of FILE with a
+'current date + counter' file extension (format '.YYYYMMDD[a-z]').
 If no FILE.orig backup already exists, writes a single backup of FILE to
 FILE.orig. Ignores passed directories and *.orig files.
 HELPDESCRIPTION
@@ -31,7 +31,7 @@ HELPDESCRIPTION
     echo
     cat <<HELPTEXT
     --backup-dir|-d DIR		Create backups in DIR instead of in the same
-				directory as the original file.
+				directory as the original FILE.
     --delete-original		Removes the original FILE after creating
 				FILE.orig; you can use this for a final backup
 				before getting rid of the FILE.
@@ -46,7 +46,7 @@ HELPDESCRIPTION
     --accept-nonexisting	Do not print an error if FILE does not exist,
 				but simply print the would-be backup extension.
 				Useful for direct-backup use cases where there's
-				either no original file or it is located
+				either no original FILE or it is located
 				somewhere else. If you'd rather not create a
 				backup if FILE does not exist yet, just
 				suppress stderr and use the empty output (e.g.
@@ -54,9 +54,10 @@ HELPDESCRIPTION
 				exit status 1.
 EXIT STATUS:
     0	Complete success.
-    1	Failed to backup any file(s).
-    2	Partial success; some file(s) could not be backed up.
-    3	Bad invocation, wrong or missing command-line arguments.
+    1	Failed to backup any FILE(s).
+    2   Bad invocation, wrong or missing command-line arguments
+    3	Internal error or failed assertion.
+    6	Partial success; some FILE(s) could not be backed up.
 HELPTEXT
 }
 
@@ -80,7 +81,7 @@ do
 	--accept-nonexisting)
 			anyBackupArgs+=("$1"); shift;;
 	--)		shift; break;;
-	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 3;;
+	-*)		{ echo "ERROR: Unknown option \"${1}\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
     esac
 done
@@ -113,5 +114,5 @@ do
 done
 
 if [ "$isFailure" ]; then
-    [ "$isSuccess" ] && exit 2 || exit 1
+    [ "$isSuccess" ] && exit 6 || exit 1
 fi
