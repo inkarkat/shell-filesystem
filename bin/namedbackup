@@ -237,15 +237,15 @@ archiveAndBackup()
 	archiveRedirect='>/dev/null'
     fi
 
-    pushd "${baseDirspec}" >/dev/null && \
-	eval "${archiveProgram}" '"${backupFilespec}" "${archivedFiles[@]}"' "$archiveRedirect" && {
+    (
+	cd "${baseDirspec}" || return 1
+	if eval "${archiveProgram}" '"${backupFilespec}" "${archivedFiles[@]}"' "$archiveRedirect"; then
 	    printBackupFile "${backupDirspec:-${baseDirspec}/}${name}${counter:+ (${counter})}${archiveExtension}"
-	    popd >/dev/null || :
-	} || {
-	    echo >&2 'ERROR: Could not create archive.'
-	    popd >/dev/null || :
-	    return 1
-	}
+	else
+	    printf >&2 'ERROR: Could not create archive: %s\n' "${backupDirspec:-${baseDirspec}/}${name}${counter:+ (${counter})}${archiveExtension}"
+	    exit 1
+	fi
+    )
 }
 
 doBackup()
