@@ -44,24 +44,24 @@ case "$action" in
 	    exit 2
 	fi
 
-	TMPDIR="${TEMP:-/tmp}/$(pathAsFilename --encode "$FILESPEC")"
-	mkdir -p "$TMPDIR" || exit $?
+	tempDirspec="${TMPDIR:-/tmp}/$(pathAsFilename --encode "$FILESPEC")"
+	mkdir -p "$tempDirspec" || exit $?
 
-	fuse-zip "$FILESPEC" "$TMPDIR" || exit $?
+	fuse-zip "$FILESPEC" "$tempDirspec" || exit $?
 
-	[ "$isQuiet" ] || printf >&2 '%s mounted. Apply any changes / unmount via either\n    fusermount -u %q && rmdir %q\n    popd; %q -u %s\n' "$FILESPEC" "$TMPDIR" "$TMPDIR" "$(basename -- "$0")" "$FILESPEC"
-	printf '%s\n' "$TMPDIR"
+	[ "$isQuiet" ] || printf >&2 '%s mounted. Apply any changes / unmount via either\n    fusermount -u %q && rmdir %q\n    popd; %q -u %s\n' "$FILESPEC" "$tempDirspec" "$tempDirspec" "$(basename -- "$0")" "$FILESPEC"
+	printf '%s\n' "$tempDirspec"
 	;;
     unmount)
 	if [ -d "$FILESPEC" ]; then
-	    TMPDIR="$FILESPEC"
+	    tempDirspec="$FILESPEC"
 	else
-	    TMPDIR="${TEMP:-/tmp}/$(pathAsFilename --encode "$FILESPEC")"
+	    tempDirspec="${TMPDIR:-/tmp}/$(pathAsFilename --encode "$FILESPEC")"
 	fi
 
-	[ -d "$TMPDIR" ] || { echo >&2 "ERROR: $FILESPEC is not mounted at $TMPDIR"; exit 1; }
+	[ -d "$tempDirspec" ] || { echo >&2 "ERROR: $FILESPEC is not mounted at $tempDirspec"; exit 1; }
 
-	fusermount -u "$TMPDIR" && rmdir "$TMPDIR"
+	fusermount -u "$tempDirspec" && rmdir "$tempDirspec"
 	;;
     *)
 	printf >&2 'ASSERT: Invalid action: %s\n' "$action"

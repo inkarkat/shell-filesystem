@@ -90,10 +90,10 @@ checkMode()
     # creating a temp file / dir and comparing its mode.
     local TMPFILE
     if [ -d "$filespec" ]; then
-	TMPFILE="$(mktemp --directory --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || { dirspec="${TEMP:-/tmp}/$(basename -- "$0").$$$RANDOM"; mkdir -p -- "$dirspec" && printf %s "$dirspec"; })" || exit 3
+	TMPFILE="$(mktemp --directory --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || { dirspec="${TMPDIR:-/tmp}/$(basename -- "$0").$$$RANDOM"; mkdir -p -- "$dirspec" && printf %s "$dirspec"; })" || exit 3
 	typeset -a cleanupCommand=(rmdir)
     else
-	TMPFILE="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || { filespec="${TEMP:-/tmp}/$(basename -- "$0").$$$RANDOM"; touch -- "$filespec" && printf %s "$filespec"; })" || exit 3
+	TMPFILE="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || { filespec="${TMPDIR:-/tmp}/$(basename -- "$0").$$$RANDOM"; touch -- "$filespec" && printf %s "$filespec"; })" || exit 3
 	typeset -a cleanupCommand=(rm --force)
     fi
     chmod --reference "$filespec" -- "$TMPFILE" || exit 3
