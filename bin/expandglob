@@ -1,17 +1,40 @@
 #!/bin/bash
 shopt -qs extglob nullglob dotglob
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+printf 'Usage: %q %s\n' "$(basename "$1")" "[--] FILE|'FILE-GLOB' [...] [-?|-h|--help]"
+}
 printUsage()
 {
-    cat <<HELPTEXT
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
 Print a list of FILE(s) that exist and files matching FILE-GLOB(s). If an
 argument both represents an existing file and also matches as a glob, both
 literal file and glob results are returned.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+SEE ALSO:
+- globmatch can also match the filename or subpaths (in addition to the full
+  filespec), can take multiple GLOBs, but needs to have FILESPECs passed.
+- hasglobmatch is expandglob without printing the result (and leaving early).
 HELPTEXT
-printf 'Usage: %q %s\n' "$(basename "$1")" "[--] FILE|'FILE-GLOB' [...] [-?|-h|--help]"
 }
 case "$1" in
-    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+    --help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
     --)			shift;;
 esac
 if [ $# -eq 0 ]; then

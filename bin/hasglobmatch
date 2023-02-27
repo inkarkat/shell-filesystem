@@ -1,15 +1,36 @@
 #!/bin/bash
 shopt -qs extglob nullglob dotglob
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" "'FILE-GLOB' [...] [-?|-h|--help]"
+}
 printUsage()
 {
-    cat <<HELPTEXT
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
 Check whether the passed FILE-GLOB(s) matches any files.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+SEE ALSO:
+- expandglob is hasglobmatch with printing all results.
 HELPTEXT
-printf 'Usage: %q %s\n' "$(basename "$1")" "'FILE-GLOB' [...] [-?|-h|--help]"
 }
 case "$1" in
-    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+    --help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 esac
 if [ $# -eq 0 ]; then
     printUsage "$0" >&2
