@@ -44,6 +44,6 @@ eval "typeset -a files=($*)"
 # was passed, it's not eliminated by nullglob.
 for f in "${files[@]}"
 do
-    [ -e "$f" ] && exit 0
+    [ -e "$f" -o -h "$f" ] && exit 0
 done
 exit 1

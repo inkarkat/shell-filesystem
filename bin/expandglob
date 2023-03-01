@@ -46,14 +46,14 @@ IFS=' '
 typeset -a result=()
 for arg
 do
-    [ -e "$arg" ] && result+=("$arg")
+    [ -e "$arg" -o  -h "$arg" ] && result+=("$arg")
 
     # Still need to check for existing files; in case a FILE-GLOB without a
     # wildcard was passed, it's not eliminated by nullglob.
     eval "typeset -a files=(${arg// /\\ })"
     for f in "${files[@]}"
     do
-	[ -e "$f" ] && result+=("$f")
+	[ -e "$f" -o  -h "$f" ] && result+=("$f")
     done
 done
 
