@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-a|--after FILE|'FILE-GLOB' [...] [-C|--count-if-sentinel-missing N] | -c|--count N] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-d|--directory] [-a|--after FILE|'FILE-GLOB' [...] [-C|--count-if-sentinel-missing N] | -c|--count N] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -27,6 +27,8 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     cat <<HELPTEXT
+    --directory|-d	    Directly print last passed DIRSPEC(s) instead of
+			    file(s) inside it.
     --after|-a FILE|'FILE-GLOB'
 			    Print all files that alphabetically come after FILE
 			    (ignoring any path components) / the last file
@@ -46,6 +48,7 @@ EXIT STATUS:
 HELPTEXT
 }
 
+isDirectories=
 typeset -a globs=()
 sentinelMissingCount=
 unset count
@@ -53,6 +56,7 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--directory|-d)	shift; isDirectories=t;;
 	--after|-a)	shift; globs+=("$1"); shift;;
 	--count-if-sentinel-missing|-C)
 			shift; sentinelMissingCount="$1"; shift;;
@@ -112,7 +116,7 @@ findLast()
 typeset -a basenameAndFilespecs=()
 for dirOrFile
 do
-    if [ -d "$dirOrFile" ]; then
+    if [ ! "$isDirectories" ] && [ -d "$dirOrFile" ]; then
 	for filespec in "$dirOrFile"/*
 	do
 	    [ -d "$filespec" ] || basenameAndFilespecs+=("${filespec##*/}/$filespec")
