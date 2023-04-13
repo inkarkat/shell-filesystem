@@ -5,13 +5,24 @@ printUsage()
 {
     cat <<HELPTEXT
 Delete all empty directories (also recursively) inside the current directory /
-passed DIR.
+passed DIR (also any DIR itself, unless -k|--keep-roots is given).
 HELPTEXT
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[--] [DIR ...] [-?|-h|--help]'
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-k|--keep-roots] [--] [DIR ...] [-?|-h|--help]'
 }
-case "$1" in
-    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-    --)			shift;;
-esac
 
-exec find "$@" -type d -empty -delete
+typeset -a findArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--keep-roots|-k)
+			shift; findArgs+=(-mindepth 1);;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+
+
+exec find "$@" "${findArgs[@]}" -type d -empty -delete
