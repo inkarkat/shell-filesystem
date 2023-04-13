@@ -14,4 +14,4 @@ case "$1" in
     --)			shift;;
 esac
 
-find "$@" -depth -type d -empty -print0 | xargs --null rmdir
+exec find "$@" -type d -empty -delete
