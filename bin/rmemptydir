@@ -7,10 +7,11 @@ printUsage()
 Delete all empty directories (also recursively) inside the current directory /
 passed DIR.
 HELPTEXT
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[DIR ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--] [DIR ...] [-?|-h|--help]'
 }
 case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+    --)			shift;;
 esac
 
 find "$@" -depth -type d -empty -print0 | xargs --null rmdir
