@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-printf 'Usage: %q %s\n' "$(basename "$1")" "[--] FILE|'FILE-GLOB' [...] [-?|-h|--help]"
+printf 'Usage: %q %s\n' "$(basename "$1")" "[-f|--first-matching|-l|--last-matching|-1|--single-only] [--] FILE|'FILE-GLOB' [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -27,16 +27,29 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
+    --first-matching|-f	Only print the first matching file.
+    --last-matching|-l	Only print the last matching file.
+    --single-only|-1	Only print the single matching file, but fail (without
+			output) if there's either no match at all or more than one.
 SEE ALSO:
 - globmatch can also match the filename or subpaths (in addition to the full
   filespec), can take multiple GLOBs, but needs to have FILESPECs passed.
 - hasglobmatch is expandglob without printing the result (and leaving early).
 HELPTEXT
 }
+
+matchIndex=
+isSingleOnly=
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--first-matching|-f)
+			shift; matchIndex=0;;
+	--last-matching|-l)
+			shift; matchIndex=-1;;
+	--single-only|-1)
+			shift; matchIndex=0; isSingleOnly=t;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -63,4 +76,12 @@ do
 done
 
 [ ${#result[@]} -eq 0 ] && exit 1
-printf '%s\n' "${result[@]}" | sort --unique
+readarray -t result < <(printf '%s\n' "${result[@]}" | sort --unique)
+
+if [ "$isSingleOnly" ] && [ ${#result[@]} -ne 1 ]; then
+    exit 1
+elif [ -n "$matchIndex" ]; then
+    result=("${result[$matchIndex]}")
+fi
+
+printf '%s\n' "${result[@]}"
