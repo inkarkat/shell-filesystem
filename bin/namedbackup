@@ -275,7 +275,7 @@ doBackup()
 		    case $? in
 			0)  break;;
 			2)  continue;;
-			*)  isFailure=t;;
+			*)  isFailure=t; continue 2;;
 		    esac
 		else
 		    break
