@@ -17,7 +17,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-1|--each|-a|--archive] -n|--name NAME [--archive-program "zip -9 -r" --archive-extension .zip] [-C|--on-conflict ask|backup|increment|error|overwrite|update] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-p|--parents] [-D|--delete-original] [--] FILE [...] [--help|-h|-?]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-1|--each|-a|--archive] -n|--name NAME [--archive-program "zip -9 -r" --archive-extension .zip] [-C|--on-conflict ask|backup|increment|error|overwrite|overwrite?|update] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-p|--parents] [-D|--delete-original] [--] FILE [...] [--help|-h|-?]'
     echo
     printf 'Usage: backupFilespec=$(%q %s)\n' "$(basename "$1")" '[...] [--] FILE [...]'
 }
@@ -55,13 +55,14 @@ HELPDESCRIPTION
 			Configure the archive extension for a custom archiver.
     --on-conflict|-C ask|increment|error|overwrite|update
 			Behavior when the backup already exists:
-			    ask:	Query whether the backup should be
-					overwritten. (This is the default.)
+			    ask:	Query what should be done.
 			    backup:	Backup the existing backup.
 			    increment:	Append or increment a (1) to the NAME to
 					create a non-existing backup filespec.
 			    error:	Don't create a backup.
 			    overwrite:	Delete the existing backup.
+			    overwrite?:	Query first whether the backup should be
+					overwritten.
 			    update:	Update existing files and add new ones
 					to the archive. For single FILEs the
 					same as overwrite.
@@ -124,7 +125,7 @@ do
 	--archive-extension)
 			shift; archiveExtension="$1"; shift;;
 	--on-conflict|-C)
-			shift; onConflict="$1"; shift;;
+			shift; onConflict="${1//\?/Query}"; shift;;
 	--backup-dir|-d)
 			if [ -z "$2" ]; then
 			    { echo "ERROR: Must pass directory after ${1}!"; echo; printUsage "$0"; } >&2
@@ -167,6 +168,15 @@ if [ -n "$backupDirspec" -a ! -d "$backupDirspec" ]; then
 fi
 
 ask()
+{
+    choice="$(userchoiceFromList --question "A backup '$backupFilespec' already exists." --ignore-case 'Backup that backup, then override it' 'Increment the backup name' 'Overwrite the backup' 'Update existing files and add new ones in the backup')" \
+	|| return 1
+    onConflict="${choice%% *}"
+    onConflict=${onConflict,,}
+    $onConflict "$@"
+
+}
+overwriteQuery()
 {
     userBinaryChoice --question "Overwrite existing backup '$backupFilespec'?" --ok-cancel
 }
