@@ -17,7 +17,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-1|--each|-a|--archive] -n|--name NAME [--archive-program "zip -9 -r" --archive-extension .zip] [-C|--on-conflict ask|increment|error|overwrite|update] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-p|--parents] [-D|--delete-original] [--] FILE [...] [--help|-h|-?]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-1|--each|-a|--archive] -n|--name NAME [--archive-program "zip -9 -r" --archive-extension .zip] [-C|--on-conflict ask|backup|increment|error|overwrite|update] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-p|--parents] [-D|--delete-original] [--] FILE [...] [--help|-h|-?]'
     echo
     printf 'Usage: backupFilespec=$(%q %s)\n' "$(basename "$1")" '[...] [--] FILE [...]'
 }
@@ -57,6 +57,7 @@ HELPDESCRIPTION
 			Behavior when the backup already exists:
 			    ask:	Query whether the backup should be
 					overwritten. (This is the default.)
+			    backup:	Backup the existing backup.
 			    increment:	Append or increment a (1) to the NAME to
 					create a non-existing backup filespec.
 			    error:	Don't create a backup.
@@ -168,6 +169,10 @@ fi
 ask()
 {
     userBinaryChoice --question "Overwrite existing backup '$backupFilespec'?" --ok-cancel
+}
+backup()
+{
+    writebackup -- "$backupFilespec"
 }
 increment()
 {
