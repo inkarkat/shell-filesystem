@@ -1,6 +1,7 @@
 #!/bin/bash
 set -o pipefail
 
+: ${REDUCECONTENTS_EXEC_END=;}
 : ${REDUCECONTENTS_FILE_MARKER='{}'}
 : ${REDUCECONTENTS_FILE_DASH_MARKER='{-}'}
 fileMarker="$REDUCECONTENTS_FILE_MARKER"; unset REDUCECONTENTS_FILE_MARKER
@@ -10,7 +11,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...] ${fileMarker:+[}${fileMarker}${fileDashMarker:+|}${fileDashMarker}${fileMarker:+] [...]} ; [...] [--] DIR|FILE [...] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...] ${fileMarker:+[}${fileMarker}${fileDashMarker:+|}${fileDashMarker}${fileMarker:+] [...]} $REDUCECONTENTS_EXEC_END [...] [--] DIR|FILE [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -37,10 +38,10 @@ HELPDESCRIPTION
     --command|-c CMD	Execute CMD as a command-line. FILEs ${fileMarker:+either }are passed
 			as a combined content stream to stdin${fileMarker:+ or replace any
 			$fileMarker or $fileDashMarker marker} inside COMMANDLINE.
-    --exec COMMAND [...] ;
+    --exec COMMAND [...] $REDUCECONTENTS_EXEC_END
 			Execute COMMAND; all following arguments are taken to be
 			arguments to the COMMAND until an argument consisting of
-			';' is encountered. FILEs ${fileMarker:+either }are passed as a
+			'${REDUCECONTENTS_EXEC_END}' is encountered. FILEs ${fileMarker:+either }are passed as a
 			combined content stream to stdin${fileMarker:+ or replace any $fileMarker
 			or $fileDashMarker marker} inside COMMANDLINE.
 
@@ -70,7 +71,7 @@ do
 			cmd=
 			printf -v escapedFileMarker %q "$fileMarker"
 			printf -v escapedFileDashMarker %q "$fileDashMarker"
-			while [ $# -gt 0 -a "$1" != ';' ]
+			while [ $# -gt 0 -a "$1" != "$REDUCECONTENTS_EXEC_END" ]
 			do
 			    printf -v quotedArg '%q' "$1"
 			    quotedArg="${quotedArg//"$escapedFileMarker"/$fileMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
@@ -79,7 +80,7 @@ do
 			    commandArgs+=("$1"); shift
 			done
 			if [ $# -eq 0 ]; then
-			    echo 'ERROR: --exec command must be concluded with ;!'; echo; printUsage "$0"
+			    echo "ERROR: --exec command must be concluded with '${REDUCECONTENTS_EXEC_END}'"; echo; printUsage "$0"
 			    exit 2
 			fi >&2
 			commandArgs+=("$1"); shift
@@ -91,7 +92,7 @@ do
     esac
 done
 if [ ${#commands[@]} -eq 0 ]; then
-    echo 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or --exec SIMPLECOMMAND [...] ;.'
+    echo "ERROR: No COMMAND(s) specified; need to pass -c|--command \"COMMANDLINE\", or --exec SIMPLECOMMAND [...] $REDUCECONTENTS_EXEC_END"
     echo
     printUsage "$0"
     exit 2
@@ -107,7 +108,7 @@ typeset -a interpolatedCommands=("${commands[@]}")
 interpolatedCommands=("${interpolatedCommands[@]//"$fileMarker"/$quotedFiles}")
 interpolatedCommands=("${interpolatedCommands[@]//"$fileDashMarker"/$quotedFiles}")
 if [ "${interpolatedCommands[*]}" = "${commands[*]}" ]; then
-    withExpandedDirs --recursive --exec cat -- \; -- "$@" \
+    withExpandedDirs --recursive --exec cat -- "${WITHEXPANDEDDIRS_EXEC_END:-;}" -- "$@" \
 	| ifne bash -c "${interpolatedCommands[*]}"
 else
     interpolatedCommands=("${commands[@]}")
