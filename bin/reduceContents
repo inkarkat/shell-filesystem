@@ -11,7 +11,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...] ${fileMarker:+[}${fileMarker}${fileDashMarker:+|}${fileDashMarker}${fileMarker:+] [...]} $REDUCECONTENTS_EXEC_END [...] [--] DIR|FILE [...] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "-c|--command \"COMMANDLINE\" [-c ...] | --exec SIMPLECOMMAND [...] ${fileMarker:+[}${fileMarker}${fileDashMarker:+|}${fileDashMarker}${fileMarker:+] [...]} $REDUCECONTENTS_EXEC_END [--exec ...] [--] DIR|FILE [...] [-?|-h|--help]"
 }
 printUsage()
 {
