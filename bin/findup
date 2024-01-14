@@ -1,6 +1,8 @@
 #!/bin/bash
 shopt -qs extglob nullglob dotglob
 
+: ${FINDUP_COMMAND_JOINER=;}
+: ${FINDUP_EXEC_END=;}
 : ${FINDUP_FILE_MARKER='{}'}
 fileMarker="$FINDUP_FILE_MARKER"; unset FINDUP_FILE_MARKER
 
@@ -53,7 +55,7 @@ HELPDESCRIPTION
     --exec COMMAND ;	Execute COMMAND from the starting directory.${fileMarker:+ $fileMarker is
 			replaced with its filespec.}
     --execdir COMMAND ;	Execute COMMAND from the directory containing the found
-			file. $fileMarker is replaced with its filespec.
+			file.${fileMarker:+ $fileMarker is replaced with its filespec.}
 HELPTEXT
 }
 
@@ -121,7 +123,7 @@ maxdepth=
 mindepth=
 unset isPrint
 isExecDir=t
-typeset -a execCommand=()
+execCommands=
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -137,18 +139,19 @@ do
 	--print)	shift; isPrint=t;;
 	--exec)		isExecDir=;&
 	--execdir)	shift; : ${isPrint=}
-			while [ "$1" != ';' ]
+			cmd=
+			while [ $# -gt 0 -a "$1" != "$FINDUP_EXEC_END" ]
 			do
-			    if [ $# -eq 0 ]; then
-				echo 'ERROR: --exec must be concluded by ;'
-				echo
-				printUsage "$0"
-				exit 2
-			    fi >&2
-
-			    execCommand+=("$1"); shift
+			    printf -v quotedArg '%q' "$1"
+			    cmd+="${cmd:+ }${quotedArg}"
+			    shift
 			done
+			if [ $# -eq 0 ]; then
+			    echo "ERROR: --exec[dir] command must be concluded with '${FINDUP_EXEC_END}'"; echo; printUsage "$0"
+			    exit 2
+			fi >&2
 			shift
+			execCommands+="${execCommands:+ $FINDUP_COMMAND_JOINER }${cmd}"
 			;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
@@ -168,15 +171,15 @@ processMatches()
 
     [ "${isPrint-t}" ] && printf "${1}\\n" "${@:2}"
 
-    if [ ${#execCommand[@]} -gt 0 ]; then
+    if [ -n "$execCommands" ]; then
 	local filespec; printf -v filespec "$@"
-	typeset -a interpolatedCommand=("${execCommand[@]//"$fileMarker"/$filespec}")
+	interpolatedCommands="${execCommands//"$fileMarker"/$filespec}"
 	(
 	    if [ ! "$isExecDir" ]; then
 		cd "$baseDir" || exit $?
 	    fi
 
-	    "${interpolatedCommand[@]}"
+	    eval "$interpolatedCommands"
 	) || exit $?
     fi
 }
