@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-k|--keep-roots] [--] [DIR ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-k|--keep-roots|-p|--parents] [--] [DIR ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -28,21 +28,40 @@ HELPDESCRIPTION
     cat <<HELPTEXT
     --keep-roots|-k	Don't delete the passed DIR(s) themselves, only their
 			empty subdirectories.
+    --parents|-p	Also (recursively) delete any empty parent directories
+			of the passed DIR(s).
 HELPTEXT
 }
 
 typeset -a findArgs=()
+postAction=
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--keep-roots|-k)
 			shift; findArgs+=(-mindepth 1);;
+	--parents|-p)	shift; findArgs+=(-mindepth 1); postAction=removeParents;; # Leave the passed DIR(s); rmdir will remove those (and any empty parents).
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
     esac
 done
+[ $# -gt 0 ] || set -- .
 
+removeParents()
+{
+    # rmdir only considers the components of the passed arguments, so all DIR(s)
+    # need to be converted absolute paths. (This is mostly the value-add of this
+    # script.)
+    typeset -a absoluteFilespecs=()
+    for filespec
+    do
+	absoluteFilespecs+=("$(realpath --no-symlinks -- "$filespec")") || absoluteFilespecs+=("$filespec")
+    done
+    rmdir --ignore-fail-on-non-empty --parents -- "${absoluteFilespecs[@]:?}"
+}
 
-exec find "$@" "${findArgs[@]}" -type d -empty -delete
+find "$@" "${findArgs[@]}" -type d -empty -delete; status=$?
+[ -z "$postAction" ] || "$postAction" "$@" || status=$?
+exit $status
