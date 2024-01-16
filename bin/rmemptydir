@@ -1,21 +1,41 @@
 #!/bin/bash
 set -o pipefail
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-k|--keep-roots] [--] [DIR ...] [-?|-h|--help]'
+}
 printUsage()
 {
-    cat <<HELPTEXT
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
 Delete all empty directories (also recursively) inside the current directory /
-passed DIR (also any DIR itself, unless -k|--keep-roots is given).
-HELPTEXT
+passed DIR(s) (also DIR itself).
+HELPDESCRIPTION
     echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-k|--keep-roots] [--] [DIR ...] [-?|-h|--help]'
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --keep-roots|-k	Don't delete the passed DIR(s) themselves, only their
+			empty subdirectories.
+HELPTEXT
 }
 
 typeset -a findArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
-	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--keep-roots|-k)
 			shift; findArgs+=(-mindepth 1);;
 	--)		shift; break;;
