@@ -2,7 +2,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--force] [-q|--quiet|-v|--verbose] [--] [FILE, ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--force] [-q|--quiet|-v|--verbose] [--] FILE|DIR [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -16,7 +16,7 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Remove files and directories that are empty.
+Remove FILE(s) and DIR(s) that are empty.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
