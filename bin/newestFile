@@ -30,6 +30,13 @@ HELPDESCRIPTION
 			(seconds since 1970).
     --name-only|-n	Omit the file modification date, just print the file
 			path (as returned by find).
+    -maxdepth 1		Do not recurse into subdirectories.
+
+SEE ALSO:
+- newestFiles (plural) can include more than one file, based on counting or a
+  sentinel file. It does not (but can) recurse by default and can also directly
+  include directories themselves.
+
 EXIT STATUS:
     0	Complete success.
     1	No files found.
@@ -46,7 +53,6 @@ do
 			shift; outputFormat='fileAge';;
 	--name-only|-n)	shift; outputFormat='filespec';;
 	--)		shift; break;;
-	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
     esac
 done
