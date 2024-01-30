@@ -44,6 +44,10 @@ HELPDESCRIPTION
 			    available) instead of just the last one / all newer.
     --include-epoch|-e	    Put the file modification date (seconds since 1970)
 			    before each filespec, separated by a tab.
+SEE ALSO:
+- newestFile (singular) prints only the single newest file, not all of them, and
+  recurses by default.
+
 EXIT STATUS:
     0	Complete success.
     1	No files found.
