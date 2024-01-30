@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-t|--newer-than EPOCH|-N|--newer FILE|'FILE-GLOB' [...]|-c|--count N] [-e|--include-epoch] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-d|--include-directories|-r|--recursive] [-t|--newer-than EPOCH|-N|--newer FILE|'FILE-GLOB' [...]|-c|--count N] [-e|--include-epoch] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -26,6 +26,13 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     cat <<HELPTEXT
+    --include-directories|-d
+			    Also consider directories in the current directory /
+			    the single passed DIRSPEC / of the passed
+			    DIRSPEC|FILESPEC. By default, only files are
+			    considered.
+    --recursive|-r	    Consider the current directory tree / subdirectories
+			    with any nesting within DIRSPEC(s).
     --newer-than|-t EPOCH   Print all files that have been modified after EPOCH
 			    (seconds since 1970).
     --newer|-N FILE|'FILE-GLOB'
@@ -47,6 +54,7 @@ HELPTEXT
 
 typeset -a sortByDateThenFilespec=(sort --field-separator $'\t' -k 1,1n -k 2f)
 typeset -a cutter=(cut -f 2-)
+directoryStrategy=ignore
 sentinelAge=
 typeset -a globs=()
 unset count
@@ -54,6 +62,9 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--include-directories|-d)
+			shift; directoryStrategy=include;;
+	--recursive|-r)	shift; directoryStrategy=recurse;;
 	--newer-than|-t)
 			shift; sentinelAge="$1"; shift
 			if [[ ! "$sentinelAge" =~ ^[0-9]+$ ]]; then
@@ -128,14 +139,38 @@ fi
 typeset -a limiter=(); [ -n "$count" ] && limiter=(tail -n "$count")
 
 typeset -a filespecs=()
-for dirOrFile
-do
-    if [ -d "$dirOrFile" ]; then
-	filespecs+=("${dirOrFile%/}"/*)
-    elif [ -e "$dirOrFile" ]; then
-	filespecs+=("$dirOrFile")
-    fi
-done
+addFiles()
+{
+    local dirOrFile; for dirOrFile
+    do
+	if [ -d "$dirOrFile" ]; then
+	    case "$directoryStrategy" in
+		drop)	    ;;
+		ignore)     if [ $# -eq 1 ]; then
+				# CWD or single passed DIRSPEC: Include only files in it.
+				directoryStrategy=drop
+				addFiles "${dirOrFile%/}"/*
+			    else
+				# Multiple DIRSPEC|FILESPEC: Skip the directory itself.
+				:
+			    fi
+			    ;;
+		include)    if [ $# -eq 1 ]; then
+				# CWD or single passed DIRSPEC: Include directories in it (once).
+				filespecs+=("${dirOrFile%/}"/*)
+			    else
+				# Multiple DIRSPEC|FILESPEC: Include the directory itself.
+				filespecs+=("$dirOrFile")
+			    fi
+			    ;;
+		recurse)    addFiles "${dirOrFile%/}"/*;;
+	    esac
+	elif [ -e "$dirOrFile" ]; then
+	    filespecs+=("$dirOrFile")
+	fi
+    done
+}
+addFiles "$@"
 [ ${#filespecs[@]} -eq 0 ] && exit 1
 
 $algorithm | \
