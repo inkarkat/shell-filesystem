@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-b|--bare] [-t|--types LIST] [-u|--user|-U|--no-user] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-b|--bare|-w|--wide] [-t|--types LIST] [-u|--user|-U|--no-user] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -26,6 +26,8 @@ HELPDESCRIPTION
     cat <<HELPTEXT
     --bare|-b		Do not print a header and omit any additional
 			information; just print the mount points themselves.
+    --wide|-w		Force detailed output even if the terminal width is too
+			small to avoid wrapping.
     --types|-t LIST	Limit the set of printed filesystems. More than one type
 			may be specified in a comma-separated list. The list of
 			filesystem types can be prefixed with "no" to specify
@@ -36,6 +38,7 @@ HELPTEXT
 }
 
 isBare=
+isWide=
 typeset -a additionalSedArgs=()
 typeset -a findmntArgs=()
 while [ $# -ne 0 ]
@@ -43,6 +46,7 @@ do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--bare|-b)	shift; isBare=t;;
+	--wide|-w)	shift; isWide=t;;
 	--types|-t)	findmntArgs+=("$1" "$2"); shift; shift;;
 	--user|-u)	shift; additionalSedArgs+=(-e "/^\/media\/${USER}\//!d");;
 	--no-user|-U)	shift; additionalSedArgs+=(-e "/^\/media\/${USER}\//d");;
@@ -53,7 +57,18 @@ do
 done
 
 #mount "$@" | sed -e '/ on \/\(dev\|proc\|run\|snap\|sys\)[ /]/d' -e '/^veracrypt /d' -e 's/ \(on\|type\) / /g' | sort -k 2,2 | column -t
-findmnt --list --output target,source,fstype,size,use%,options "${findmntArgs[@]}" | \
+typeset -a outputColumns=(target source fstype size use% options)
+if [ ! "$isWide" ]; then
+    if [ ${COLUMNS:-80} -le 100 ]; then
+	outputColumns=("${outputColumns[@]:0:$((${#outputColumns[@]} - 1))}")
+    fi
+    if [ ${COLUMNS:-80} -le 80 ]; then
+	outputColumns=("${outputColumns[@]:0:$((${#outputColumns[@]} - 1))}")
+    fi
+fi
+
+IFS=,
+findmnt --list --output "${outputColumns[*]}" "${findmntArgs[@]}" | \
     {
 	read -r header; [ "$isBare" ] || printf '%s\n' "$header"
 	sed -e '/^\/\(dev\|proc\|run\|snap\|sys\)[ /]/d' -e '/[[:space:]]veracrypt[[:space:]]/d' "${additionalSedArgs[@]}" | \
