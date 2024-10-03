@@ -6,6 +6,8 @@ printShortUsage()
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
     printf 'Usage: %q %s\n' "$(basename "$1")" "[-d|--include-directories|-r|--recursive] [-t|--newer-than EPOCH|-N|--newer FILE|'FILE-GLOB' [...]|-c|--count N] [-e|--include-epoch] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-t|--newer-than EPOCH|-N|--newer FILE|'FILE-GLOB' [...]|-c|--count N] [-e|--include-epoch] [--] [DIRSPEC [...]] [FIND-ARGS ...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -20,8 +22,8 @@ printLongUsage()
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
 Print the filespecs of the last modified file(s) in the current directory / in
-each passed DIRSPEC / within each passed FILESPEC. Output order is globally
-sorted by modification date, ascending.
+each passed DIRSPEC [matching FIND-ARGS] / within each passed FILESPEC. Output
+order is globally sorted by modification date, ascending.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -174,7 +176,23 @@ addFiles()
 	fi
     done
 }
-addFiles "$@"
+findFiles()
+{
+    readarray -d '' -t filespecs < <(find "$@" -printf '%p\0'; printf '%d\0' "$?")	# Exit status from the process substitution is lost; return the actual exit status via an appended additional record.
+    [ ${filespecs[-1]} -ne 0 ] && exit 3
+    unset 'filespecs[-1]'
+}
+sourceCommand=addFiles
+for arg
+do
+    # FIND-ARGS start with - and do not exist as files.
+    if [[ "$arg" =~ ^- ]] && [ ! -e "$arg" ]; then
+	sourceCommand=findFiles
+	break
+    fi
+done
+
+$sourceCommand "$@" || exit 3
 [ ${#filespecs[@]} -eq 0 ] && exit 1
 
 $algorithm | \
