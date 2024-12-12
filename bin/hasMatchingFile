@@ -1,11 +1,10 @@
 #!/bin/bash
-shopt -qs extglob nullglob dotglob
 
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "'FILE-GLOB' [...] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-r|--recursive] 'FILENAME-GLOB' DIR [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -19,33 +18,36 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Check whether the passed FILE-GLOB(s) matches any files.
+Check if a file matching a given FILENAME-GLOB exists in given DIR(s).
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
+    --recursive|-r	Also search subdirectories.
+
 SEE ALSO:
-- expandglob is hasglobmatch with printing all results.
-- hasMatchingFile matches in passed dir(s) and can search the entire directory
-  tree(s).
+- hasglobmatch takes a FILE-GLOB that's based on the current directory and
+  doesn't recurse.
 HELPTEXT
 }
+
+typeset -a findDepthArgs=(-maxdepth 1)
 case "$1" in
     --help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+    --recursive|-r)	findDepthArgs=(); shift;;
 esac
-if [ $# -eq 0 ]; then
+if [ $# -lt 2 ]; then
     printUsage "$0" >&2
     exit 2
 fi
+glob="${1:?}"; shift
 
-eval "typeset -a files=($*)"
-# If globbing didn't yield anything, we've failed.
-((${#files[@]})) || exit 1
-# Still need to check for existing files; in case a FILE-GLOB without a wildcard
-# was passed, it's not eliminated by nullglob.
-for f in "${files[@]}"
+# Drop nonexisting directories; the glob can't match in them.
+typeset -a dirspecs=()
+for arg
 do
-    [ -e "$f" -o -h "$f" ] && exit 0
+    [ -d "$arg" ] && dirspecs+=("$arg")
 done
-exit 1
+
+[ -n "$(find "${dirspecs[@]}" "${findDepthArgs[@]}" -name "$glob" -print -quit)" ]
