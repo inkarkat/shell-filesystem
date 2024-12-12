@@ -5,9 +5,9 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-d|--include-directories|-r|--recursive] [-t|--newer-than EPOCH|-N|--newer FILE|'FILE-GLOB' [...]|-c|--count N] [-e|--include-epoch] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-d|--include-directories|-r|--recursive] [-t|--newer-than EPOCH|-N|--newer FILE|'FILE-GLOB' [...]|-c|--count N] [-o|--offset N] [-e|--include-epoch] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
     echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-t|--newer-than EPOCH|-N|--newer FILE|'FILE-GLOB' [...]|-c|--count N] [-e|--include-epoch] [--] [DIRSPEC [...]] [FIND-ARGS ...] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-t|--newer-than EPOCH|-N|--newer FILE|'FILE-GLOB' [...]|-c|--count N] [-o|--offset N] [-e|--include-epoch] [--] [DIRSPEC [...]] [FIND-ARGS ...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -44,6 +44,8 @@ HELPDESCRIPTION
 			    sorted by modification date, ascending.
     --count|-c N	    Print the last N modified files (or fewer if not
 			    available) instead of just the last one / all newer.
+    --offset|-o N	    Skip the last (newest) N file(s). This is applied
+			    before --count.
     --include-epoch|-e	    Put the file modification date (seconds since 1970)
 			    before each filespec, separated by a tab.
 SEE ALSO:
@@ -64,6 +66,7 @@ directoryStrategy=ignore
 sentinelAge=
 typeset -a globs=()
 unset count
+typeset -a offsetter=()
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -81,7 +84,8 @@ do
 			fi >&2
 			;;
 	--newer|-N)	shift; globs+=("$1"); shift;;
-	--count|-c)	shift; count="$1"; shift;;
+	--count|-c)	shift; count="${1:?}"; shift;;
+	--offset|-o)	shift; offsetter=(head "-n-${1:?}"); shift;;
 	--include-epoch|-e)
 			shift; cutter=();;
 	--)		shift; break;;
@@ -197,6 +201,7 @@ $sourceCommand "$@" || exit 3
 
 $algorithm | \
     eval '"${sortByDateThenFilespec[@]}"' \
+    "${offsetter:+|}" '"${offsetter[@]}"' \
     "${limiter:+|}" '"${limiter[@]}"' \
     "${cutter:+|}" '"${cutter[@]}"' \
     | outputOrError
