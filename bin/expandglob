@@ -1,5 +1,5 @@
 #!/bin/bash
-shopt -qs extglob nullglob dotglob
+shopt -qs extglob nullglob dotglob globstar
 
 printShortUsage()
 {
@@ -60,15 +60,16 @@ if [ $# -eq 0 ]; then
     exit 2
 fi
 
-IFS=' '
+IFS=$'\n'
 typeset -a result=()
 for arg
 do
-    [ -e "$arg" -o  -h "$arg" ] && result+=("$arg")
+    [ -e "$arg" -o -h "$arg" ] && result+=("$arg")
 
     # Still need to check for existing files; in case a FILE-GLOB without a
     # wildcard was passed, it's not eliminated by nullglob.
-    eval "typeset -a files=(${arg// /\\ })"
+    # shellcheck disable=SC2206
+    typeset -a files=($arg)
     for f in "${files[@]}"
     do
 	[ -e "$f" -o  -h "$f" ] && result+=("$f")
