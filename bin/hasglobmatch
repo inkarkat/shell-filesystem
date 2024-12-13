@@ -39,13 +39,18 @@ if [ $# -eq 0 ]; then
     exit 2
 fi
 
-eval "typeset -a files=($*)"
-# If globbing didn't yield anything, we've failed.
-((${#files[@]})) || exit 1
-# Still need to check for existing files; in case a FILE-GLOB without a wildcard
-# was passed, it's not eliminated by nullglob.
-for f in "${files[@]}"
+IFS=$'\n'
+for arg
 do
-    [ -e "$f" -o -h "$f" ] && exit 0
+    [ -e "$arg" -o -h "$arg" ] && exit 0
+
+    # Still need to check for existing files; in case a FILE-GLOB without a
+    # wildcard was passed, it's not eliminated by nullglob.
+    # shellcheck disable=SC2206
+    typeset -a files=($arg)
+    for f in "${files[@]}"
+    do
+	[ -e "$f" -o  -h "$f" ] && exit 0
+    done
 done
 exit 1
