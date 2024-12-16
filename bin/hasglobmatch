@@ -42,6 +42,17 @@ fi
 IFS=$'\n'
 for arg
 do
+    # Handle tilde expansion.
+    if [[ "$arg" =~ ^(\\?~)([^/]*)(.*) ]]; then
+	if [ "${BASH_REMATCH[1]}" = '\~' ]; then
+	    arg="~${BASH_REMATCH[2]}${BASH_REMATCH[3]}"
+	elif [ -z "${BASH_REMATCH[2]}" ]; then
+	    arg="${HOME}${BASH_REMATCH[3]}"
+	else
+	    arg="$(eval printf %s ~${BASH_REMATCH[2]})${BASH_REMATCH[3]}"
+	fi
+    fi
+
     [ -e "$arg" -o -h "$arg" ] && exit 0
 
     # Still need to check for existing files; in case a FILE-GLOB without a
