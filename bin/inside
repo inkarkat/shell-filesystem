@@ -50,7 +50,7 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-	--dir|-d)	shift; dirspecs+=("$(readlinkWrapper "$1")"); shift;;
+	--directory|-d)	shift; dirspecs+=("$(readlinkWrapper "$1")"); shift;;
 	--directories|-D)
 			shift
 			while [ $# -gt 0 -a "$1" != "$INSIDE_DIRECTORIES_END" ]
