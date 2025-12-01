@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[SORT-ARGS ...] [-d|--directory] [-a|--after FILE|'FILE-GLOB' [...] [-C|--count-if-sentinel-missing N] | -c|--count N] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[SORT-ARGS ...] [-d|--directory] [-a|--after FILE|'FILE-GLOB' [...] [-C|--count-if-sentinel-missing N] | -c|--count N] [-o|--offset N] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -39,6 +39,8 @@ HELPDESCRIPTION
 			    if no sentinel FILE|'FILE-GLOB' exists.
     --count|-c N	    Print the last N files (or fewer if not available)
 			    instead of just the last one.
+    --offset|-o N	    Skip the last N file(s). This is applied before
+			    --count.
 EXIT STATUS:
     0	Complete success.
     1	No files found.
@@ -52,6 +54,7 @@ isDirectories=
 typeset -a globs=()
 sentinelMissingCount=
 unset count
+typeset -a offsetter=()
 typeset -a sortArgs=()
 while [ $# -ne 0 ]
 do
@@ -62,6 +65,7 @@ do
 	--count-if-sentinel-missing|-C)
 			shift; sentinelMissingCount="$1"; shift;;
 	--count|-c)	shift; count="$1"; shift;;
+	--offset|-o)	shift; offsetter=(head "-n-${1:?}"); shift;;
 
 	-+([bdfgiMhnRrVs]))
 			sortArgs+=("$1"); shift;;
@@ -137,7 +141,12 @@ do
 done
 [ ${#basenameAndFilespecs[@]} -eq 0 ] && exit 1
 
-readarray -t filespecs < <(printf '%s\n' "${basenameAndFilespecs[@]}" | sort --unique "${sortArgs[@]}" | cut -d / -f 2-)
+readarray -t filespecs < <(
+    printf '%s\n' "${basenameAndFilespecs[@]}" \
+	| sort --unique "${sortArgs[@]}" \
+	| eval 'cut -d / -f 2-' \
+	"${offsetter:+|}" '"${offsetter[@]}"'
+)
 
 if [ ${#globs[@]} -gt 0 ]; then
     findAfter
