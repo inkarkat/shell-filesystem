@@ -1,11 +1,11 @@
 #!/bin/bash
-shopt -qs nullglob
+shopt -qs extglob nullglob
 
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-d|--directory] [-a|--after FILE|'FILE-GLOB' [...] [-C|--count-if-sentinel-missing N] | -c|--count N] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[SORT-ARGS ...] [-d|--directory] [-a|--after FILE|'FILE-GLOB' [...] [-C|--count-if-sentinel-missing N] | -c|--count N] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -52,6 +52,7 @@ isDirectories=
 typeset -a globs=()
 sentinelMissingCount=
 unset count
+typeset -a sortArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -61,6 +62,15 @@ do
 	--count-if-sentinel-missing|-C)
 			shift; sentinelMissingCount="$1"; shift;;
 	--count|-c)	shift; count="$1"; shift;;
+
+	-+([bdfgiMhnRrVs]))
+			sortArgs+=("$1"); shift;;
+	--@(dictionary-order|general-numeric-sort|human-numeric-sort|ignore-case|ignore-leading-blanks|ignore-nonprinting|month-sort|numeric-sort|random-sort|reverse|stable|version-sort))
+			sortArgs+=("$1"); shift;;
+	-[kStT])	sortArgs+=("$1" "${2?}"); shift; shift;;
+	--@(batch-size|buffer-size|field-separator|key|parallel|random-source|sort|temporary-directory))
+			sortArgs+=("$1" "${2?}"); shift; shift;;
+
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -127,7 +137,7 @@ do
 done
 [ ${#basenameAndFilespecs[@]} -eq 0 ] && exit 1
 
-readarray -t filespecs < <(printf '%s\n' "${basenameAndFilespecs[@]}" | sort --unique | cut -d / -f 2-)
+readarray -t filespecs < <(printf '%s\n' "${basenameAndFilespecs[@]}" | sort --unique "${sortArgs[@]}" | cut -d / -f 2-)
 
 if [ ${#globs[@]} -gt 0 ]; then
     findAfter
