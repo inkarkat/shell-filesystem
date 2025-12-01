@@ -46,6 +46,9 @@ HELPDESCRIPTION
 			    instead of just the last one.
     --offset|-o N	    Skip the last N file(s). This is applied before
 			    --count.
+SEE ALSO:
+- truncateDir builds the inverse set of files can remove those first files.
+
 EXIT STATUS:
     0	Complete success.
     1	No files found.

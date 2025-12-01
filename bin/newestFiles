@@ -51,6 +51,7 @@ HELPDESCRIPTION
 SEE ALSO:
 - newestFile (singular) prints only the single newest file, not all of them, and
   recurses by default.
+- truncateDir builds the inverse set of files can remove those old files.
 
 EXIT STATUS:
     0	Complete success.

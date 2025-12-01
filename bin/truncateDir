@@ -1,0 +1,177 @@
+#!/bin/bash
+shopt -qs extglob nullglob
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, they can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" "--first [LASTFILES-ARGS ...]|--oldest [NEWESTFILES-ARGS ...] [-d|--include-directories|-r|--recursive] [-c|--count N] [-o|--offset N] [--remove [--dir|--rm-recursive] [-f|--force] [-i|-I|--interactive[=WHEN]]] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Print (or actually remove) the first or oldest file(s) in the current directory
+/ in each passed DIRSPEC / within each passed FILESPEC, leaving only the last /
+newest behind.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --first		    Remove the alphabetically first file(s).
+    --oldest		    Remove the least recently modified (i.e. oldest)
+			    file(s).
+    --include-directories|-d
+			    Also consider directories in the current directory /
+			    the single passed DIRSPEC / of the passed
+			    DIRSPEC|FILESPEC. By default, only files are
+			    considered.
+    --recursive|-r	    Consider the current directory tree / subdirectories
+			    with any nesting within DIRSPEC(s).
+    --count|-c N	    Keep the last / newest N files instead of just the
+			    last one.
+    --offset|-o N	    Always remove the last / newest N file(s). This is
+			    applied before --count.
+    --remove		    Directly remove the files instead of just printing
+			    their filespecs.
+    --dir		    Remove empty directories.
+    --rm-recursive	    Remove directories and their contents recursively.
+    --force|-f		    Ignore nonexistent files and arguments, never
+			    prompt.
+    -i			    Prompt before every removal.
+    -I			    Prompt once before removing more than three files,
+			    or  when  removing  recursively;  less intrusive
+			    than -i, while still giving protection against most
+			    mistakes.
+    --interactive[=WHEN]    Prompt according to WHEN: never, once (-I), or
+			    always (-i); without WHEN, prompt always.
+SEE ALSO:
+- latestFiles and newestFiles are used by this command to print the filespecs of
+  the alphabetically last / last modified file(s).
+
+EXIT STATUS:
+    0	Complete success.
+    2	Bad invocation, wrong or missing command-line arguments.
+    3	Internal error or failed assertion.
+    4	No applicable files exist, no action necessary.
+    99	No files to truncate.
+HELPTEXT
+}
+
+action=print
+directoryStrategy=ignore
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--include-directories|-d)
+			sourceCommandArgs+=("$1"); shift; directoryStrategy=include;;
+	--recursive|-r)	sourceCommandArgs+=("$1"); shift; directoryStrategy=recurse;;
+
+	--first)	shift; sourceCommand=lastFiles;;
+	--oldest)	shift; sourceCommand=newestFiles;;
+	--after|-a|--count-if-sentinel-missing|-C)
+			sourceCommandArgs+=("$1" "${2?}"); shift; shift; sourceCommand=lastFiles;;
+	-+([bdfgMhnRrVs]))
+			sourceCommandArgs+=("$1"); shift; sourceCommand=lastFiles;;
+	--@(dictionary-order|general-numeric-sort|human-numeric-sort|ignore-case|ignore-leading-blanks|ignore-nonprinting|month-sort|numeric-sort|random-sort|reverse|stable|version-sort))
+			sourceCommandArgs+=("$1"); shift; sourceCommand=lastFiles;;
+	-[kStT])	sourceCommandArgs+=("$1" "${2?}"); shift; shift; sourceCommand=lastFiles;;
+	--@(batch-size|buffer-size|field-separator|key|parallel|random-source|sort|temporary-directory))
+			sourceCommandArgs+=("$1" "${2?}"); shift; shift; sourceCommand=lastFiles;;
+
+	--newer-than|-t|--newer|-N)
+			sourceCommandArgs+=("$1" "${2?}"); shift; shift; sourceCommand=newestFiles;;
+
+	--count|-c|--offset|-o)
+			sourceCommandArgs+=("$1" "${2?}"); shift; shift;;
+
+	--remove)	shift; action=remove;;
+	--rm-recursive)	shift; rmArgs+=(--recursive);;
+	--dir|--force|-f|-i|-I|--interactive=*)
+			rmArgs+=("$1"); shift;;
+	--interactive)	rmArgs+=("$1" "${2:?}"); shift; shift;;
+
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ -z "$sourceCommand" ]; then
+    echo 'ERROR: Need --first or --oldest.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
+[ $# -gt 0 ] || set -- "$PWD"
+
+print()
+{
+    printf '%s\n' "$@"
+}
+
+remove()
+{
+    exec rm "${rmArgs[@]}" -- "$@"
+}
+
+typeset -a filespecs=()
+addFiles()
+{
+    local dirOrFile; for dirOrFile
+    do
+	if [ -d "$dirOrFile" ]; then
+	    case "$directoryStrategy" in
+		drop)	    ;;
+		ignore)     if [ $# -eq 1 ]; then
+				# CWD or single passed DIRSPEC: Include only files in it.
+				directoryStrategy=drop
+				addFiles "${dirOrFile%/}"/*
+			    else
+				# Multiple DIRSPEC|FILESPEC: Skip the directory itself.
+				:
+			    fi
+			    ;;
+		include)    if [ $# -eq 1 ]; then
+				# CWD or single passed DIRSPEC: Include directories in it (once).
+				filespecs+=("${dirOrFile%/}"/*)
+			    else
+				# Multiple DIRSPEC|FILESPEC: Include the directory itself.
+				filespecs+=("$dirOrFile")
+			    fi
+			    ;;
+		recurse)    addFiles "${dirOrFile%/}"/*;;
+	    esac
+	elif [ -e "$dirOrFile" ]; then
+	    filespecs+=("$dirOrFile")
+	fi
+    done
+}
+addFiles "$@"
+[ ${#filespecs[@]} -gt 0 ] || exit 4
+
+typeset -A keptFilespecs=()
+exitStatus=
+while IFS=$'\n' read -r f || { exitStatus="$f"; break; }	# Exit status from the process substitution (<(pipeline)) is lost; return the actual exit status via an incomplete (i.e. missing the newline) last line.
+do
+    keptFilespecs["$f"]=t
+done < <($sourceCommand "${sourceCommandArgs[@]}" -- "$@"; printf %d "$?")
+[ $exitStatus -eq 0 -o $exitStatus -eq 1 ] || exit $exitStatus
+
+typeset -a truncatedFilespecs=()
+for filespec in "${filespecs[@]}"
+do
+    [ "${keptFilespecs["$filespec"]}" ] || truncatedFilespecs+=("$filespec")
+done
+[ ${#truncatedFilespecs[@]} -gt 0 ] || exit 99
+
+$action "${truncatedFilespecs[@]}"
