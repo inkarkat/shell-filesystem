@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[SORT-ARGS ...] [-d|--directory] [-a|--after FILE|'FILE-GLOB' [...] [-C|--count-if-sentinel-missing N] | -c|--count N] [-o|--offset N] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[SORT-ARGS ...] [-d|--include-directories|-r|--recursive] [-a|--after FILE|'FILE-GLOB' [...] [-C|--count-if-sentinel-missing N] | -c|--count N] [-o|--offset N] [--] [DIRSPEC|FILESPEC [...]] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -27,8 +27,13 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     cat <<HELPTEXT
-    --directory|-d	    Directly print last passed DIRSPEC(s) instead of
-			    file(s) inside it.
+    --include-directories|-d
+			    Also consider directories in the current directory /
+			    the single passed DIRSPEC / of the passed
+			    DIRSPEC|FILESPEC. By default, only files are
+			    considered.
+    --recursive|-r	    Consider the current directory tree / subdirectories
+			    with any nesting within DIRSPEC(s).
     --after|-a FILE|'FILE-GLOB'
 			    Print all files that alphabetically come after FILE
 			    (ignoring any path components) / the last file
@@ -50,7 +55,7 @@ EXIT STATUS:
 HELPTEXT
 }
 
-isDirectories=
+directoryStrategy=ignore
 typeset -a globs=()
 sentinelMissingCount=
 unset count
@@ -60,7 +65,9 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
-	--directory|-d)	shift; isDirectories=t;;
+	--include-directories|-d)
+			shift; directoryStrategy=include;;
+	--recursive|-r)	shift; directoryStrategy=recurse;;
 	--after|-a)	shift; globs+=("$1"); shift;;
 	--count-if-sentinel-missing|-C)
 			shift; sentinelMissingCount="$1"; shift;;
@@ -128,17 +135,41 @@ findLast()
 }
 
 typeset -a basenameAndFilespecs=()
-for dirOrFile
-do
-    if [ ! "$isDirectories" ] && [ -d "$dirOrFile" ]; then
-	for filespec in "$dirOrFile"/*
-	do
-	    [ -d "$filespec" ] || basenameAndFilespecs+=("${filespec##*/}/$filespec")
-	done
-    elif [ -e "$dirOrFile" ]; then
-	basenameAndFilespecs+=("${dirOrFile##*/}/$dirOrFile")
-    fi
-done
+addFiles()
+{
+    local dirOrFile; for dirOrFile
+    do
+	if [ -d "$dirOrFile" ]; then
+	    case "$directoryStrategy" in
+		drop)	    ;;
+		ignore)     if [ $# -eq 1 ]; then
+				# CWD or single passed DIRSPEC: Include only files in it.
+				directoryStrategy=drop
+				addFiles "${dirOrFile%/}"/*
+			    else
+				# Multiple DIRSPEC|FILESPEC: Skip the directory itself.
+				:
+			    fi
+			    ;;
+		include)    if [ $# -eq 1 ]; then
+				# CWD or single passed DIRSPEC: Include directories in it (once).
+				for filespec in "${dirOrFile%/}"/*
+				do
+				    basenameAndFilespecs+=("${filespec##*/}/$filespec")
+				done
+			    else
+				# Multiple DIRSPEC|FILESPEC: Include the directory itself.
+				basenameAndFilespecs+=("${dirOrFile##*/}/$dirOrFile")
+			    fi
+			    ;;
+		recurse)    addFiles "${dirOrFile%/}"/*;;
+	    esac
+	elif [ -e "$dirOrFile" ]; then
+	    basenameAndFilespecs+=("${dirOrFile##*/}/$dirOrFile")
+	fi
+    done
+}
+addFiles "$@"
 [ ${#basenameAndFilespecs[@]} -eq 0 ] && exit 1
 
 readarray -t filespecs < <(
