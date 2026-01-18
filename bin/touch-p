@@ -32,6 +32,9 @@ HELPDESCRIPTION
     --no-update|-U	Do not update the timestamp of existing files.
     --mode|-m MODE	Set file mode (as in chmod).
     --verbose|-v	Print a message for each created directory.
+
+SEE ALSO:
+- redir-p can be used to create a FILE and simultaneous provide its contents.
 HELPTEXT
 }
 
