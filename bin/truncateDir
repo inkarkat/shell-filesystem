@@ -55,7 +55,7 @@ HELPDESCRIPTION
     --interactive[=WHEN]    Prompt according to WHEN: never, once (-I), or
 			    always (-i); without WHEN, prompt always.
 SEE ALSO:
-- latestFiles and newestFiles are used by this command to print the filespecs of
+- lastFiles and newestFiles are used by this command to print the filespecs of
   the alphabetically last / last modified file(s).
 
 EXIT STATUS:
