@@ -39,6 +39,8 @@ SEE ALSO:
 - globmatch can also match the filename or subpaths (in addition to the full
   filespec), can take multiple GLOBs, but needs to have FILESPECs passed.
 - hasglobmatch is expandglob without printing the result (and leaving early).
+- lastFiles works like --last-matching and has more options to control the
+  result, but cannot filter via a glob.
 HELPTEXT
 }
 

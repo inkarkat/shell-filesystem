@@ -26,6 +26,7 @@ precedence for identical filenames).
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
+    echo
     cat <<HELPTEXT
     --include-directories|-d
 			    Also consider directories in the current directory /
@@ -48,6 +49,8 @@ HELPDESCRIPTION
 			    --count.
 SEE ALSO:
 - truncateDir builds the inverse set of files and can remove those first files.
+- expandglob --last-matching is limited to a single result, but can choose from
+  a subset of the files in a directory.
 
 EXIT STATUS:
     0	Complete success.
