@@ -6,7 +6,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [WRITEORIG_EXT=orig] %q %s\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] [--backup-dir|-d DIR] [--delete-original] [--] FILE|DIR [...] [-?|-h|--help]'
+    printf 'Usage: [WRITEORIG_EXT=orig] %q %s\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] [-x|--keep-extension] [--backup-dir|-d DIR] [--delete-original] [--] FILE|DIR [...] [-?|-h|--help]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--overwrite|--once-today|-k|--keep] [--backup-dir|-d DIR] [--delete-original] --ignore-no-files [--] [FILE|DIR [...]] [-?|-h|--help]'
     echo
     printf 'Usage: sed -i"$(%q %s)" -e ... FILE|DIR\n' "$(basename "$1")" '--get-extension [-f|--overwrite|--once-today|-k|--keep] [--accept-nonexisting] [--] FILE|DIR'
@@ -35,6 +35,10 @@ HELPDESCRIPTION
 				today.
     --keep|-k			Do nothing if the backup already exists
 				(default behavior), and succeed instead.
+    --keep-extension|-x		Insert .${WRITEORIG_EXT} before the file
+				extension of FILE, i.e.
+				FILE.${WRITEORIG_EXT}.ext instead of
+				FILE.ext.${WRITEORIG_EXT}
     --backup-dir|-d DIR		Create backups in DIR instead of in the same
 				directory as the original FILE.
     --delete-original		Removes the original FILE after creating
@@ -66,6 +70,7 @@ HELPTEXT
 }
 
 isOverwrite=
+isKeepExtension=
 isOnceToday=
 backupExistsStatus=1
 backupDir=
@@ -80,6 +85,8 @@ do
 	--overwrite|-f)	shift; isOverwrite=t;;
 	--once-today)	shift; isOnceToday=t;;
 	--keep|-k)	shift; isOverwrite=; backupExistsStatus=0;;
+	--keep-extension|-x)
+			shift; isKeepExtension=t;;
 	--backup-dir|-d)
 			if [ -z "$2" ]; then
 			    { echo "ERROR: Must pass directory after ${1}!"; echo; printUsage "$0"; } >&2
@@ -136,6 +143,7 @@ writebackup()
     local -r filespec="$1"
 
     [[ "$filespec" = *."$WRITEORIG_EXT" ]] && return 1  # Don't backup original files themselves; this allows passing a generic glob like * to it.
+    [ "$isKeepExtension" ] && [[ "$filespec" = *."$WRITEORIG_EXT".* ]] && return 1
 
     if [ -e "$filespec" ]; then
 	if [ ! -r "$filespec" ]; then
@@ -147,7 +155,11 @@ writebackup()
 	else
 	    local -r rebasedFilespec="${filespec}"
 	fi
-	local -r backupFilespec="${rebasedFilespec}.${WRITEORIG_EXT}"
+	if [ "$isKeepExtension" ]; then
+	    local backupFilespec; backupFilespec="$(fileExtension --splice ".${WRITEORIG_EXT}" -- "$rebasedFilespec")" || return 3
+	else
+	    local -r backupFilespec="${rebasedFilespec}.${WRITEORIG_EXT}"
+	fi
 
 	if [ -e "$backupFilespec" ]; then
 	    if [ "$isOverwrite" ]; then
