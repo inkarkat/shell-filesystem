@@ -143,10 +143,12 @@ writebackup()
 	    return 1
 	fi
 	if [ -n "$backupDir" ]; then
-	    local -r backupFilespec="${backupDir}$(basename -- "${filespec}").${WRITEORIG_EXT}"
+	    local -r rebasedFilespec="${backupDir}$(basename -- "${filespec}")"
 	else
-	    local -r backupFilespec="${filespec}.${WRITEORIG_EXT}"
+	    local -r rebasedFilespec="${filespec}"
 	fi
+	local -r backupFilespec="${rebasedFilespec}.${WRITEORIG_EXT}"
+
 	if [ -e "$backupFilespec" ]; then
 	    if [ "$isOverwrite" ]; then
 		:
