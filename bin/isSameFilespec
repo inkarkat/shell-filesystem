@@ -1,0 +1,44 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+Test whther all passed FILE(s) refer to the same file, canonicalizing the
+filespecs and following symlinks. Unlike Bash's "test -ef", the filespecs are
+not required to exist.
+HELPTEXT
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--] FILE [...] [-?|-h|--help]'
+}
+
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+esac
+
+# https://github.com/dominictarr/JSON.sh/pull/2#issuecomment-2526006
+readlinkEmulation()
+{
+    if ! cd "$(dirname "$1")" 2>/dev/null; then
+	# The directory does not exist; return as-is.
+	printf %s "$1"
+	return
+    fi
+
+    local filename="$(basename "$1")"
+    if [ -h "$filename" ]; then
+	readlinkEmulation "$(readlink "$filename")"
+    else
+	printf %s "$(pwd -P)/${filename}"
+    fi
+}
+readlinkWrapper()
+{
+    readlink -nf "$@" 2>/dev/null || readlinkEmulation "$@"
+}
+
+firstFilespec="$(readlinkWrapper "$1")"; shift
+for filespec
+do
+    [ "$(readlinkWrapper "$filespec")" = "$firstFilespec" ] || exit 1
+done
+exit 0
