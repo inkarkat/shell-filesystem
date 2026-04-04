@@ -128,7 +128,7 @@ calculateTimeRange()
 	fileDivision="$((epoch / timedivider))"
 	[ $age $spanCompareOp $((nowDivision - fileDivision)) ]
     else
-	[ $((now - epoch)) $spanCompareOp $age ]
+	[ $age $spanCompareOp $((now - epoch)) ]
     fi
 }
 
