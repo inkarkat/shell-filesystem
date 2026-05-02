@@ -93,20 +93,36 @@ if [ "$isIgnoreNonexisting" ]; then
     set -- "${temp[@]}"
 fi
 
-fileAge -le "$age" -- "$@" 2>/dev/null; status=$?
+readarray -t outdatedFiles < <(fileAge --newer "$age" --with-filename --output best-unit -- "$@" 2>/dev/null; printf '\n%d\n' "$?")	# Exit status from the process substitution is lost; return the actual exit status via an appended additional line.
+status=${outdatedFiles[-1]}
+unset 'outdatedFiles[-1]'; [ -n "${outdatedFiles[-1]}" ] || unset 'outdatedFiles[-1]'
 if [ $status -ne 0 ]; then
     if [ $# -eq 1 ]; then
 	if [ $status -eq 4 ]; then
 	    printf '%s%s%s does not exist.%s\n' "$OUTDATEDFILEWARNING_COLOR_NONEXISTING" "${severityNonexisting}${severityNonexisting:+: }" "${subject:-$1}" "$OUTDATEDFILEWARNING_COLOR_RESET"
 	else
-	    printf '%s%s%s is older than %s: %s%s\n' "$OUTDATEDFILEWARNING_COLOR_OUTDATED" "${severityOutdated}${severityOutdated:+: }" "${subject:-$1}" "$age" "$(reldate --epoch "$(fileAge -- "$1")" 2>/dev/null || printf 'n/a')" "$OUTDATEDFILEWARNING_COLOR_RESET"
+	    printf '%s%s%s is older than %s: %s%s\n' "$OUTDATEDFILEWARNING_COLOR_OUTDATED" "${severityOutdated}${severityOutdated:+: }" "${subject:-$1}" "$age" "${outdatedFiles[0]%%$'\t'*}" "$OUTDATEDFILEWARNING_COLOR_RESET"
 	fi
     else
 	if [ $status -eq 4 ]; then
 	    printf '%s%sSome %s do not exist.%s\n' "$OUTDATEDFILEWARNING_COLOR_NONEXISTING" "${severityNonexisting}${severityNonexisting:+: }" "${subject:-file(s)}" "$OUTDATEDFILEWARNING_COLOR_RESET"
 	else
-	    oldestFile="$(fileAge --with-filename -- "$@" | sort --numeric-sort | head -n 1 | reldate --epoch-lines)"
-	    printf '%s%sSome %s are older than %s: %s%s\n' "$OUTDATEDFILEWARNING_COLOR_OUTDATED" "${severityOutdated}${severityOutdated:+: }" "${subject:-file(s)}" "$age"  "${oldestFile/$'\t'/: }" "$OUTDATEDFILEWARNING_COLOR_RESET"
+	    if [ ${#outdatedFiles[@]} -eq 1 ]; then
+		outdatedFilesPlural=
+		outdatedFilesCount=One
+		outdatedFilesAuxiliaryVerb=is
+		outdatedFilesSeparator=' '
+	    else
+		outdatedFilesPlural=s
+		outdatedFilesCount=${#outdatedFiles[@]}
+		outdatedFilesAuxiliaryVerb=are
+		outdatedFilesSeparator='\n'
+	    fi
+	    IFS=$'\n'
+	    printf "%s%s%s %s%s %s older than %s:${outdatedFilesSeparator}%s%s\\n" \
+		"$OUTDATEDFILEWARNING_COLOR_OUTDATED" "${severityOutdated}${severityOutdated:+: }" \
+		"$outdatedFilesCount" "${subject:-file}" "$outdatedFilesPlural" "$outdatedFilesAuxiliaryVerb" "$age" \
+		"${outdatedFiles[*]//$'\t'/: }" "$OUTDATEDFILEWARNING_COLOR_RESET"
 	fi
     fi
     exit $status
