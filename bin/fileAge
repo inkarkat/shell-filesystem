@@ -1,165 +1,53 @@
 #!/bin/bash
-shopt -qs extglob
+
+wrappedDatediff()
+{
+    DATEDIFF_COMMAND="$(basename "$0")" \
+    DATEDIFF_WHAT='the age (time of last data modification) of all passed FILE(s)' \
+    DATEDIFF_INPUT_ARGS='[-f|--with-filename] [--] FILE [...]' \
+    DATEDIFF_ADDITIONAL_OPTIONS='    -f|--with-filename	Append a tab and the filespec to each line.
+' \
+    exec datediff "$@"
+}
 
 printUsage()
 {
-    cat <<HELPDESCRIPTION
-Show the age (time of last data modification) in seconds since the Epoch (or
-seconds passed with -d|--diff) of all passed FILE(s). With -f|--with-filename,
-appends a tab and the file name to each line.
-HELPDESCRIPTION
-    echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-d|--diff] [-f|--with-filename] [--] FILE [...] [-?|-h|--help]'
-    printf 'Usage: reldate --epoch "$(%q %s)"\n' "$(basename "$1")" '[--] FILE'
-    printf 'Usage: %q %s | reldate --epoch-lines\n' "$(basename "$1")" '[--] FILE [...]'
-    echo
-    cat <<HELPDESCRIPTION
-Test whether the age of [all] FILE[s] is greater / smaller than AGE.
-SUFFIX may be 's' for seconds (the default), 'm' for minutes, 'h' for hours, 'd'
-for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
-HELPDESCRIPTION
-    echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '-n|--newer|-o|--older|-lt|-le|-eq|-ne|-ge|-gt AGE[SUFFIX] [--] FILE [...]'
-    echo
-    cat <<HELPDESCRIPTION
-Test whether the age of [all] FILE[s] falls inside / outside TIMESLOT.
-TIMESLOT can be one of second|minute|hour|day|week|month|year, or
-every N seconds|minutes|hours|days|weeks|months|years|generations, which doesn't
-translate to a fixed age, but instead ensures that this (including negative ages
-from the future) falls into / outside the slot.
-For example, "day" would yield false despite an actual age difference of only
-seconds, if the one is before midnight and the other shortly after midnight,
-whereas "every 1 day" would yield true as long as the actual difference is
-within 86400 seconds.
-HELPDESCRIPTION
-    echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '-w|--within|-W|--without s[econd]|m[inute]|h[our]|d[ay]|w[eek]|mo[nth]|y[ear]|every N (s[econd[s]]|m[inute[s]]|h[our[s]]|d[ay[s]]|w[eek[s]]|mo[nth[s]]|y[ear[s]]|g[eneration[s]]) [--] FILE [...]'
-    echo
-    cat <<HELPTEXT
-EXIT STATUS:
-    0	Complete success.
-    1	The comparison failed; at least one FILE did not pass it.
-    2	Bad invocation, wrong or missing command-line arguments.
-    4	Some of the passed FILE(s) do not exist.
-HELPTEXT
+    wrappedDatediff --print-usage >&2
 }
 
-getSpan()
-{
-    local divider="$1"; shift
-    divider="${divider#every }"
-    divider="${divider% +([a-z])}"
-    printf '%d' "$divider"
-}
-parseTime()
-{
-    case "$1" in
-	+([0-9])?(s))			    age="${1%s}";;
-	+([0-9])m)			    age=$((${1%m} * 60));;
-	+([0-9])h)			    age=$((${1%h} * 3600));;
-	+([0-9])d)			    age=$((${1%d} * 86400));;
-	+([0-9])w)			    age=$((${1%w} * 86400 * 7));;
-	+([0-9])mo)			    age=$((${1%mo} * 86400 * 30));;
-	+([0-9])y)			    age=$((${1%y} * 86400 * 365));;
-	+([0-9])g)			    age=$((${1%g} * 86400 * 9131));;
-	s?(econd))			    timeformat='%s';;
-	m?(inute))			    timeformat='%F_%H:%M';;
-	h?(our))			    timeformat='%F_%H';;
-	d?(ay))				    timeformat='%F';;
-	w?(eek))			    timeformat='%G_%V';;
-	mo?(nth))			    timeformat='%Y_%m';;
-	y?(ear))			    timeformat='%Y';;
-	every\ +([0-9])\ s?(econd?(s)))	    age="$(getSpan "$1")"; timedivider=1;;
-	every\ +([0-9])\ m?(inute?(s)))	    age="$(getSpan "$1")"; timedivider=60;;
-	every\ +([0-9])\ h?(our?(s)))	    age="$(getSpan "$1")"; timedivider=3600;;
-	every\ +([0-9])\ d?(ay?(s)))	    age="$(getSpan "$1")"; timedivider=86400;;
-	every\ +([0-9])\ w?(eek?(s)))	    age="$(getSpan "$1")"; timedivider=$((86400 * 7));;
-	every\ +([0-9])\ mo?(nth?(s)))	    age="$(getSpan "$1")"; timedivider=$((86400 * 30));;
-	every\ +([0-9])\ y?(ear?(s)))	    age="$(getSpan "$1")"; timedivider=$((86400 * 365));;
-	every\ +([0-9])\ g?(eneration?(s))) age="$(getSpan "$1")"; timedivider=$((86400 * 9131));;
-	*)				    printf >&2 'ERROR: Invalid age/TIMESLOT: "%s".\n' "$1"; printUsage "$0" >&2; exit 2;;
-    esac
-}
-
-spanCompareOp=
-formatCompareOp=
-isDiff=
+typeset -a datediffArgs=()
+typeset -a datediffOutputArgs=()
 formatAddendum=
 while [ $# -ne 0 ]
 do
     case "$1" in
-	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-	--diff|-d)	shift; isDiff=t;;
+	--help|-h|-\?)	wrappedDatediff "$@";;
 	--with-filename|-f)
 			shift; formatAddendum=$'\t%n';;
-	--newer|-n)	shift; parseTime "$1"; shift; spanCompareOp=-lt;;
-	--older|-o)	shift; parseTime "$1"; shift; spanCompareOp=-gt;;
-	-lt|-le|-eq|-ne|-ge|-gt)
-			spanCompareOp="$1"; shift; parseTime "$1"; shift;;
-	--within|-w)	shift; parseTime "$1"; spanCompareOp='-ge'; formatCompareOp='='; shift;;
-	--without|-W)	shift; parseTime "$1"; spanCompareOp='-le'; formatCompareOp='!='; shift;;
 	--)		shift; break;;
-	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	--output|-o)	datediffOutputArgs+=("$1" "${2:?}"); shift; shift;;
+	-*)		if argCount=$(datediff --understands "$@"); then
+			    while ((argCount-- > 0))
+			    do
+				datediffArgs+=("$1"); shift
+			    done
+			elif [ $? -eq 2 ]; then
+			    exit 2
+			else
+			    { echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2
+			fi
+			;;
 	*)		break;;
     esac
 done
 if [ $# -eq 0 ]; then
     printUsage "$0" >&2
-    exit 2
 fi
+[ -n "$formatAddendum" ] && [ ${#datediffOutputArgs[@]} -eq 0 ] && datediffOutputArgs=(--output whole-units)
 
-getEpoch()
-{
-    stat --dereference --format "%Y${formatAddendum}" -- "$@" || return 4
-}
-calculateTimeRange()
-{
-    local epoch="${1:?}"; shift
-    local now="$(date +%s)"
-
-    if [ -n "$timeformat" ]; then
-	local nowTime fileTime
-	nowTime="$(date --date "@$now" "+$timeformat")" || exit 3
-	fileTime="$(date --date "@$epoch" "+$timeformat")" || exit 3
-	[ "$fileTime" $formatCompareOp "$nowTime" ]
-    elif [ -n "$timedivider" ]; then
-	local nowDivision fileDivision
-	nowDivision="$((now / timedivider))"
-	fileDivision="$((epoch / timedivider))"
-	delta=$((nowDivision - fileDivision))
-	[ $age $spanCompareOp $((delta < 0 ? -delta : delta)) ]
-    else
-	[ $age $spanCompareOp $((now - epoch)) ]
-    fi
-}
-
-if [ -n "$spanCompareOp" ]; then
-    if [ -n "$formatAddendum" ]; then
-	echo 'ERROR: Cannot combine -f|--with-filename with AGE comparison.'
-	echo
-	printUsage "$0"
-	exit 2
-    fi >&2
-
-    exitStatus=3
-    compareStatus=0
-    while IFS=$'\n' read -r epoch || { exitStatus="$epoch"; break; }	# Exit status from the process substitution (<(getEpoch)) is lost; return the actual exit status via an incomplete (i.e. missing the newline) last line.
-    do
-	calculateTimeRange "$epoch" || compareStatus=1
-    done < <(getEpoch "$@"; printf %d "$?")
-    exit $((exitStatus > 0 ? exitStatus : compareStatus))
-elif [ "$isDiff" ]; then
-    now="$(date +%s)"
-    exitStatus=3
-    while IFS=$'\t' read -r epoch addendum || { exitStatus="$epoch"; break; }	# Exit status from the process substitution (<(getEpoch)) is lost; return the actual exit status via an incomplete (i.e. missing the newline) last line.
-    do
-	if [ -n "$formatAddendum" ]; then
-	    printf '%d	%s\n' "$((now - epoch))" "$addendum"
-	else
-	    printf '%d\n' "$((now - epoch))"
-	fi
-    done < <(getEpoch "$@"; printf %d "$?")
-    exit $exitStatus
+fileAges="$(stat --dereference --format "@%Y${formatAddendum}" -- "$@")" || exit 4
+if [ $# -eq 1 -a -z "$formatAddendum" ]; then
+    wrappedDatediff "${datediffArgs[@]}" "${datediffOutputArgs[@]}" "$fileAges"
 else
-    getEpoch "$@"
+    printf '%s\n' "$fileAges" | wrappedDatediff "${datediffArgs[@]}" "${datediffOutputArgs[@]}" --file=-
 fi
