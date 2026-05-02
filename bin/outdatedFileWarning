@@ -1,8 +1,8 @@
 #!/bin/bash
 
-: ${OUTDATEDFILEWARNING_COLOR_NONEXISTING=[7;33m}
-: ${OUTDATEDFILEWARNING_COLOR_OUTDATED=[33m}
-: ${OUTDATEDFILEWARNING_COLOR_RESET=[0m}
+: ${OUTDATEDFILEWARNING_COLOR_NONEXISTING='[7;33m'}
+: ${OUTDATEDFILEWARNING_COLOR_OUTDATED='[33m'}
+: ${OUTDATEDFILEWARNING_COLOR_RESET='[0m'}
 [ -t 1 ] || unset "${!OUTDATEDFILEWARNING_COLOR_@}"
 
 printShortUsage()
@@ -23,7 +23,7 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Print a warning if [any of] the passed FILE[s] is older than AGE (or does not
+Print a warning if (any of) the passed FILE(s) is older than AGE (or does not
 exist at all).
 HELPDESCRIPTION
     echo
@@ -34,7 +34,7 @@ HELPDESCRIPTION
 			Do not warn if a FILE does not exist; just ignore those.
     --severity-nonexisting SEVERITY
 			Prepend SEVERITY: to the warning about non-existing
-			file(s).
+			FILE(s).
     --severity SEVERITY	Prepend SEVERITY: instead of Warning:, for both outdated
 			and non-existing files (unless --severity-nonexisting is
 			also given).
@@ -44,10 +44,10 @@ SUFFIX may be 's' for seconds (the default), 'm' for minutes, 'h' for hours, 'd'
 for days, 'w' for weeks, 'mo' for months, 'y' for years, 'g' for generations.
 
 EXIT STATUS:
-    0	All file(s) are recent.
-    1	Outdated file(s) were found and warned about.
+    0	All FILE(s) are recent.
+    1	Outdated FILE(s) were found and warned about.
     2	Bad invocation, wrong or missing command-line arguments.
-    4	Warned about non-existing file(s).
+    4	Warned about non-existing FILE(s).
 HELPTEXT
 }
 
