@@ -4,8 +4,11 @@ wrappedDatediff()
 {
     DATEDIFF_COMMAND="$(basename "$0")" \
     DATEDIFF_WHAT='the (maximum) difference between the modification dates of FILE1 and FILE2 (and ...)' \
-    DATEDIFF_INPUT_ARGS='[-f|--with-filename] [--] FILE1 FILE2 [...]' \
+    DATEDIFF_INPUT_ARGS='[-f|--with-filename|-F|--with-file-dates OUTPUT-FORMAT] [--] FILE1 FILE2 [...]' \
     DATEDIFF_ADDITIONAL_OPTIONS='    -f|--with-filename	Append the oldest and youngest filespecs on separate
+			lines (only one each).
+    -F|--with-file-dates OUTPUT-FORMAT
+			Append the file ages in the specified format on separate
 			lines (only one each).
 ' \
     exec datediff "$@"
@@ -18,12 +21,15 @@ printUsage()
 
 typeset -a datediffArgs=()
 formatAddendum=
+typeset filePrinter=(printf '%s\n')
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	wrappedDatediff "$@";;
 	--with-filename|-f)
 			shift; formatAddendum=$'\t%n';;
+	--with-file-dates|-F)
+			shift; formatAddendum=$'\t%n'; filePrinter=(fileAge --output "${1:?}" --with-filename); shift;;
 	--)		shift; break;;
 	-*)		if argCount=$(datediff --understands "$@"); then
 			    while ((argCount-- > 0))
@@ -58,5 +64,5 @@ do
 done
 
 datediff "${datediffArgs[@]}" --no-direction "@${minimumAge%%$'\t'*}" "@${maximumAge%%$'\t'*}"; status=$?
-[ -z "$formatAddendum" ] || printf '%s\n' "${minimumAge#*$'\t'}" "${maximumAge#*$'\t'}"
+[ -z "$formatAddendum" ] || "${filePrinter[@]}" "${minimumAge#*$'\t'}" "${maximumAge#*$'\t'}"
 exit $status
