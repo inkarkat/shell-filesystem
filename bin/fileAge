@@ -7,6 +7,7 @@ wrappedDatediff()
     DATEDIFF_INPUT_ARGS='[-f|--with-filename] [--] FILE [...]' \
     DATEDIFF_ADDITIONAL_OPTIONS='    -f|--with-filename	Append a tab and the filespec to each line.
 ' \
+    DATEDIFF_ADDITIONAL_EXIT_STATUS='    4	FILE does not exist.' \
     exec datediff "$@"
 }
 
