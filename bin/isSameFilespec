@@ -3,7 +3,7 @@
 printUsage()
 {
     cat <<HELPTEXT
-Test whther all passed FILE(s) refer to the same file, canonicalizing the
+Test whether all passed FILE(s) refer to the same file, canonicalizing the
 filespecs and following symlinks. Unlike Bash's "test -ef", the filespecs are
 not required to exist.
 HELPTEXT
