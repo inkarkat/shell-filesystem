@@ -6,13 +6,6 @@ shopt -qs extglob nullglob dotglob
 : ${FINDUP_FILE_MARKER='{}'}
 fileMarker="$FINDUP_FILE_MARKER"; unset FINDUP_FILE_MARKER
 
-case ",${DEBUG:-}," in
-    *,findup\!,*)	printf >&2 %s "$PS4"; printf >&2 '%q ' 'findup' "$@"; printf >&2 '\n'; exit;;
-    *,findup,*)		printf >&2 %s "$PS4"; printf >&2 '%q ' 'findup' "$@"; printf >&2 '\n';;&
-    *,findup\&,*)	printf >&2 %s "$PS4"; printf >&2 '%q ' 'findup' "$@"; printf >&2 '\n'; findupTrace='set -x';;&
-    *,findup=*,*)	findupCommand=",${DEBUG},"; findupCommand="${findupCommand#*,findup=}"; findupCommand="${findupCommand%%,*}"; exec $findupCommand "$@";;
-esac
-
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
@@ -200,36 +193,41 @@ processGlobMatches()
     done
     return $status
 }
-$findupTrace
-status=1
-for baseDir in "${startingPoints[@]:-.}"
-do
-    [ "${baseDir:?}" = . ] || cd "$baseDir"
 
-    for notAboveDir in "${notAbove[@]}"
+doFindup()
+{
+    local status=1 baseDir notAboveDir
+    for baseDir in "${startingPoints[@]:-.}"
     do
-	inside "${PWD%/}" "$notAboveDir" && continue 2
+	[ "${baseDir:?}" = . ] || cd "$baseDir"
+
+	for notAboveDir in "${notAbove[@]}"
+	do
+	    inside "${PWD%/}" "$notAboveDir" && continue 2
+	done
+
+	local oldWd=
+	let level=0
+	while [ "$oldWd" != "$PWD" ]
+	do
+	    if processGlobMatches "$@" 2>/dev/null; then
+		[ "$isStopAtFirst" ] && return 0
+		status=0
+	    fi
+
+	    [ ${#stopAt[@]} -gt 0 ] && contains "${PWD%/}" "${stopAt[@]}" && break
+	    if [ "$stopdepth" ]; then
+		currentPathSeparators="${PWD%/}"
+		currentPathSeparators="${currentPathSeparators//[^\/]/}"
+		[ ${#currentPathSeparators} -le $stopdepth ] && break
+	    fi
+
+	    oldWd="$PWD"
+	    cd .. || exit 3
+	    let level+=1
+	done
     done
+    return $status
+}
 
-    oldWd=
-    let level=0
-    while [ "$oldWd" != "$PWD" ]
-    do
-	if processGlobMatches "$@" 2>/dev/null; then
-	    [ "$isStopAtFirst" ] && exit 0
-	    status=0
-	fi
-
-	[ ${#stopAt[@]} -gt 0 ] && contains "${PWD%/}" "${stopAt[@]}" && break
-	if [ "$stopdepth" ]; then
-	    currentPathSeparators="${PWD%/}"
-	    currentPathSeparators="${currentPathSeparators//[^\/]/}"
-	    [ ${#currentPathSeparators} -le $stopdepth ] && break
-	fi
-
-	oldWd="$PWD"
-	cd .. || exit 3
-	let level+=1
-    done
-done
-exit $status
+eval "$(${DEBUG:+debugeval --command} "${DEBUG:-echo}" 'doFindup "$@"')"

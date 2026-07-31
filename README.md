@@ -5,6 +5,7 @@ _A collection of commands that provide higher-level file system operations, most
 ### Dependencies
 
 * Bash, GNU `awk`, GNU `sed`
+* [inkarkat/shell-debugging](https://github.com/inkarkat/shell-debugging) for debugging (optional)
 
 ### Installation
 
