@@ -30,14 +30,17 @@ HELPDESCRIPTION
     --first-matching|-f	Only print the first matching file.
     --last-matching|-l	Only print the last matching file.
     --single-only|-1	Only print the single matching file, but fail (without
-			output) if there's either no match at all or more than one.
+			output) if there's either no match at all or more than
+			one.
     --greater|-g|--smaller|-s|-lt|-le|-eq|-ne|-ge|-gt N
 			Test whether the number of matching files is greater /
 			smaller than N and indicate the result via exit status.
 			Does not print anything.
 SEE ALSO:
 - globmatch can also match the filename or subpaths (in addition to the full
-  filespec), can take multiple GLOBs, but needs to have FILESPECs passed.
+  filespec), can take multiple GLOBs, and is meant for generic matching, not
+  necessarily (existing) filespecs, so it needs to have FILESPEC(s) / VALUE(s)
+  passed.
 - hasglobmatch is expandglob without printing the result (and leaving early).
 - lastFiles works like --last-matching and has more options to control the
   result, but cannot filter via a glob.
