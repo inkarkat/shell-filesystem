@@ -1,11 +1,13 @@
 #!/bin/bash
 shopt -qs extglob nullglob globstar
 
+[ "$EXPANDGLOB_DOTGLOB" ] && shopt -qs dotglob
+
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[--dotglob] [-f|--first-matching|-l|--last-matching|-1|--single-only|-g|--greater|-s|--smaller|-lt|-le|-eq|-ne|-ge|-gt N] [--] FILE|'FILE-GLOB' [...] [-?|-h|--help]"
+    printf 'Usage: [EXPANDGLOB_DOTGLOB=1|t|true] %q %s\n' "$(basename "$1")" "[--dotglob] [-f|--first-matching|-l|--last-matching|-1|--single-only|-g|--greater|-s|--smaller|-lt|-le|-eq|-ne|-ge|-gt N] [--] FILE|'FILE-GLOB' [...] [-?|-h|--help]"
 }
 printUsage()
 {

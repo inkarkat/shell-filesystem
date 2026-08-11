@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[--dotglob] [-r|--recursive] [--] 'FILENAME-GLOB' DIR [...] [-?|-h|--help]"
+    printf 'Usage: [HASMATCHINGFILE_DOTGLOB=1|t|true] %q %s\n' "$(basename "$1")" "[--dotglob] [-r|--recursive] [--] 'FILENAME-GLOB' DIR [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -32,7 +32,7 @@ SEE ALSO:
 HELPTEXT
 }
 
-isFilterHidden=t
+isFilterHidden=t; [ "$HASMATCHINGFILE_DOTGLOB" ] && isFilterHidden=
 typeset -a findDepthArgs=(-maxdepth 1)
 while [ $# -ne 0 ]
 do
