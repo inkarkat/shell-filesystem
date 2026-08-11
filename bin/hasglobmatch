@@ -1,11 +1,13 @@
 #!/bin/bash
-shopt -qs extglob nullglob dotglob globstar
+shopt -qs extglob nullglob globstar
+
+[ "$HASGLOBMATCH_DOTGLOB" ] && shopt -qs dotglob
 
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-u|--unique] 'FILE-GLOB' [...] [-?|-h|--help]"
+    printf 'Usage: [HASGLOBMATCH_DOTGLOB=1|t|true] %q %s\n' "$(basename "$1")" "[--dotglob] [-u|--unique] [--] 'FILE-GLOB' [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -25,6 +27,9 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
+    --dotglob		The character . at the start of a name or immediately
+			following a slash need not be matched explicitly by a .
+			in the pattern, as if Bash's dotglob option were set.
     --unique|-u		Only succeed if a single file matches the passed
 			FILE-GLOB(s).
 SEE ALSO:
@@ -40,6 +45,7 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--dotglob)	shift; shopt -s dotglob;;
 	--unique|-u)	shift; isUniqueMatch=t; onMatch=incrementMatchCount;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;

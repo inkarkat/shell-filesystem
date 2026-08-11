@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-r|--recursive] 'FILENAME-GLOB' DIR [...] [-?|-h|--help]"
+    printf 'Usage: [HASMATCHINGFILE_DOTGLOB=1|t|true] %q %s\n' "$(basename "$1")" "[--dotglob] [-r|--recursive] [--] 'FILENAME-GLOB' DIR [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -32,11 +32,19 @@ SEE ALSO:
 HELPTEXT
 }
 
+isFilterHidden=t; [ "$HASMATCHINGFILE_DOTGLOB" ] && isFilterHidden=
 typeset -a findDepthArgs=(-maxdepth 1)
-case "$1" in
-    --help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
-    --recursive|-r)	findDepthArgs=(); shift;;
-esac
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--dotglob)	shift; isFilterHidden=;;
+	--recursive|-r)	findDepthArgs=(); shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
 if [ $# -lt 2 ]; then
     printUsage "$0" >&2
     exit 2
@@ -50,4 +58,4 @@ do
     [ -d "$arg" ] && dirspecs+=("$arg")
 done
 
-[ -n "$(find "${dirspecs[@]}" "${findDepthArgs[@]}" -name "$glob" -print -quit)" ]
+[ -n "$(find "${dirspecs[@]}" "${findDepthArgs[@]}" ${isFilterHidden:+-path '*/.*' \! -name "$glob" -prune -o} -name "$glob" -print -quit)" ]
