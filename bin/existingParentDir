@@ -1,0 +1,46 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+Locate the first existing parent directory of the passed FILE|DIR(s). This can
+be DIR itself if it exists, or the parent of FILE, or any existing directory
+until eventually / is reached. If multiple are passed, print the existing
+directory that is common to all passed FILE|DIR(s).
+HELPTEXT
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--canonicalize] [--] FILE|DIR [...] [-?|-h|--help]'
+}
+
+typeset -a commonpathArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--canonicalize|-f)
+			commonpathArgs+=("$1"); shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -eq 0 ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
+
+typeset -a existingParentDirspecs=()
+for filespec
+do
+    while [ ! -d "$filespec" ]
+    do
+	filespec="$(dirname -- "$filespec")"
+    done
+    existingParentDirspecs+=("$filespec")
+done
+if [ "${#existingParentDirspecs[@]}" -eq 1 ]; then
+    printf '%s\n' "${existingParentDirspecs[0]}"
+else
+    commonpath "${commonpathArgs[@]}" -- "${existingParentDirspecs[@]}" \
+	|| echo /
+fi
