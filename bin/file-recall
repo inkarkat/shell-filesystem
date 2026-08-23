@@ -48,15 +48,16 @@ HELPDESCRIPTION
     --recursive|-r	Also look for ${what}files in subdirectories.
 HELPTEXT
     cat <<HELPTEXT
-    GREP-ARGS [...]	Recall the newest ${what}file whose contents are matched
-			by GREP-ARGS.
-    --command|-c CMD	Execute CMD as a command-line. The recalled ${what}file
-			${fileMarker:+either }is appended${fileMarker:+ or replaces any $fileMarker marker} inside
-			COMMANDLINE.
+    GREP-ARGS [...]	Recall the newest ${what}file whose contents
+			are matched by GREP-ARGS.
+    --command|-c CMD	Execute CMD as a command-line. The recalled
+			${what}file ${fileMarker:+either }is appended${fileMarker:+ or replaces
+			any $fileMarker marker} inside COMMANDLINE.
     --exec CMD [...] ${FILERECALL_EXEC_END}	Execute CMD; all following arguments are taken to be
 			arguments to the CMD until an argument consisting of
-			'${FILERECALL_EXEC_END}' is encountered. The recalled ${what}file ${fileMarker:+either }is
-			appended${fileMarker:+ or replaces any $fileMarker marker} inside COMMANDLINE.
+			'${FILERECALL_EXEC_END}' is encountered. The recalled ${what}file
+			${fileMarker:+either }is appended${fileMarker:+ or replaces any $fileMarker marker} inside
+			COMMANDLINE.
 HELPTEXT
 }
 
