@@ -1,0 +1,87 @@
+#!/bin/bash
+shopt -qs nullglob
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, they can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-r|--recursive] [-f|--force] [-i|-I|--interactive[=WHEN]]] [--] [DIRSPEC ...] [-?|-h|--help]"
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Remove all file(s) in the current directory / in each passed DIRSPEC.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --recursive|-r	    Remove directories and their contents recursively.
+    --force|-f		    Ignore nonexistent files and arguments, never
+			    prompt.
+    -i			    Prompt before every removal.
+    -I			    Prompt once before removing more than three files,
+			    or  when  removing  recursively;  less intrusive
+			    than -i, while still giving protection against most
+			    mistakes.
+    --interactive[=WHEN]    Prompt according to WHEN: never, once (-I), or
+			    always (-i); without WHEN, prompt always.
+SEE ALSO:
+- truncateDir can leave last / newest files behind, and prints by default,
+  removes only if instructed.
+
+EXIT STATUS:
+    0	Complete success.
+    2	Bad invocation, wrong or missing command-line arguments.
+    99	No files to remove.
+HELPTEXT
+}
+
+isRecursive=
+typeset -a rmArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--recursive|-r)	shift; rmArgs+=(--recursive); isRecursive=t;;
+	--dir|--force|-f|-i|-I|--interactive=*)
+			rmArgs+=("$1"); shift;;
+	--interactive)	rmArgs+=("$1" "${2:?}"); shift; shift;;
+
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+[ $# -gt 0 ] || set -- "$PWD"
+
+typeset -a filespecs=()
+for dirspec
+do
+    if [ -d "$dirspec" ]; then
+	if [ "$isRecursive" ]; then
+	    filespecs+=("${dirspec%/}"/*)
+	else
+	    # Need to filter out subdirectories.
+	    for file in "${dirspec%/}"/*
+	    do
+		[ -d "$file" ] || filespecs+=("$file")
+	    done
+	fi
+    else
+	echo >&2 "ERROR: Not a directory: $dirspec"
+	exit 2
+    fi
+done
+[ ${#filespecs[@]} -gt 0 ] || exit 99
+
+exec rm "${rmArgs[@]}" -- "${filespecs[@]}"
