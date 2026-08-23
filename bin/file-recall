@@ -1,0 +1,217 @@
+#!/bin/bash
+set -o pipefail
+shopt -qs extglob nullglob
+
+: ${FILERECALL_BASEDIR:=.}
+: ${FILERECALL_OFFER_SUBDIRS=t}
+: ${FILERECALL_WHAT=}
+what="${FILERECALL_WHAT}${FILERECALL_WHAT:+ }"
+: ${FILERECALL_COMMAND_JOINER=;}
+: ${FILERECALL_EXEC_END=;}
+: ${FILERECALL_FILE_MARKER='{}'}
+fileMarker="$FILERECALL_FILE_MARKER"; unset FILERECALL_FILE_MARKER
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "${FILERECALL_OFFER_SUBDIRS:+[-d|--directory SUBDIR] [-r|--recursive] }[-?|-h|--help] ..."
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" '... [""|N|NAME|NAME-GLOB|[N] [GREP-ARGS ...] PATTERN]'
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... -c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${FILERECALL_EXEC_END} [--exec ...] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN] [COMMAND-ARGS ...]"
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... \"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... [-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${FILERECALL_EXEC_END} [--exec ...]] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN] -- SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "${FILERECALL:-$(basename "$1")}"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Recall previous N'th file from the ${what:-current }location, or the one where the
+file name is NAME / contains *NAME-GLOB*, or the latest one where the contents
+match (grep-style) PATTERN / GREP-ARGS.
+The output is shown in the pager, or its filespec is ${fileMarker:+either }appended to${fileMarker:+ or
+replaces any $fileMarker marker inside} COMMANDLINE (and possibly passed COMMAND-ARGS).
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    [ "$FILERECALL_OFFER_SUBDIRS" ] && cat <<HELPTEXT
+    --directory|-d SUBDIR
+			Look for ${what}files in the SUBDIR subdirectory.
+    --recursive|-r	Also look for ${what}files in subdirectories.
+HELPTEXT
+    cat <<HELPTEXT
+    GREP-ARGS [...]	Recall the newest ${what}file whose contents
+			are matched by GREP-ARGS.
+    --command|-c CMD	Execute CMD as a command-line. The recalled
+			${what}file ${fileMarker:+either }is appended${fileMarker:+ or replaces
+			any $fileMarker marker} inside COMMANDLINE.
+    --exec CMD [...] ${FILERECALL_EXEC_END}	Execute CMD; all following arguments are taken to be
+			arguments to the CMD until an argument consisting of
+			'${FILERECALL_EXEC_END}' is encountered. The recalled ${what}file
+			${fileMarker:+either }is appended${fileMarker:+ or replaces any $fileMarker marker} inside
+			COMMANDLINE.
+HELPTEXT
+}
+
+typeset -a filespecs=()
+getFiles()
+{
+    local searchDirspec="${FILERECALL_BASEDIR}${subdir:+/$subdir}"
+
+    while IFS=$'\n' read -r filespec
+    do
+	[ -d "$filespec" ] || filespecs+=("$filespec")
+    done < <(eval "ls -d -t \"\${searchDirspec}\"/${glob}")
+
+    if [ ${#filespecs[@]} -eq 0 ]; then
+	printf >&2 'ERROR: No %sfiles in %s\n' "$what" "$searchDirspec"
+	exit 2
+    fi
+}
+
+recallByNumber()
+{
+    getFiles \
+	&& printf %s "${filespecs[${1:?} - 1]}"
+}
+
+recallGrep()
+{
+    # Note: Cannot simply use $FILERECALL_BASEDIR/* glob here because we want to return a match in the newest file.
+    getFiles \
+	&& grep --no-messages --files-with-matches --directories=skip "$@" -- "${filespecs[@]}" \
+	    | sed -ne "${count:-1}p"
+}
+
+subdir=
+glob='*'
+commands=
+typeset -a commandArgs=()
+count=
+haveMatcher=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--directory|-d)	shift; [ "$FILERECALL_OFFER_SUBDIRS" ] && subdir="${1:?}"; shift;;
+	--recursive|-r)	[ "$FILERECALL_OFFER_SUBDIRS" ] && glob='**'; shift;;
+
+	--command|-c)	shift; commands+="${commands:+ $FILERECALL_COMMAND_JOINER }$1"; shift;;
+	--exec)		shift
+			cmd=
+			printf -v escapedFileMarker %q "$fileMarker"
+			while [ $# -gt 0 -a "$1" != "$FILERECALL_EXEC_END" ]
+			do
+			    printf -v quotedArg '%q' "$1"
+			    cmd+="${cmd:+ }${quotedArg//"$escapedFileMarker"/$fileMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
+			    shift
+			done
+			if [ $# -eq 0 ]; then
+			    echo "ERROR: --exec command must be concluded with '${FILERECALL_EXEC_END}'"; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			shift
+			commands+="${commands:+ $FILERECALL_COMMAND_JOINER }${cmd}"
+			;;
+
+	--regexp|-e|--file|-f)
+			grepArgs+=("$1" "${2?}"); shift; shift; haveMatcher=t;;
+	--@(regexp|file)=*)
+			grepArgs+=("$1");  shift; haveMatcher=t;;
+	-@([EFGPivwxsaIrRUz]))
+			grepArgs+=("$1"); shift;;
+	--@(extended-regexp|fixed-strings|basic-regexp|perl-regexp|ignore-case|invert-match|word-regexp|line-regexp|no-messages|text|recursive|dereference-recursive|binary|null-data))
+			grepArgs+=("$1"); shift;;
+	-[mDd])		grepArgs+=("$1" "${2?}"); shift; shift;;
+	--@(color|colour|max-count|binary-files|devices|directories|exclude|exclude-from|include)=*)
+			grepArgs+=("$1"); shift;;
+	--@(color|colour|max-count|binary-files|devices|directories|exclude|exclude-from|include))
+			grepArgs+=("$1" "${2?}"); shift; shift;;
+
+	--)		shift
+			printf -v quotedSimpleCommand '%q ' "$@"
+			printf -v escapedFileMarker %q "$fileMarker"
+			commands+="${commands:+ $FILERECALL_COMMAND_JOINER }${quotedSimpleCommand//"$escapedFileMarker"/$fileMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
+			break
+			;;
+	*)		checkGlob="$glob"; [[ "$1" =~ / ]] && checkGlob='**'
+			if [ ${#grepArgs[@]} -gt 0 ] && [ ! "$haveMatcher" ]; then
+			    # We have GREP-ARGS, but no PATTERN yet; this is the PATTERN.
+			    grepArgs+=("$1")
+			    haveMatcher=t
+			elif [ "$haveMatcher" ]; then
+			    if [ -n "$commands" ]; then
+				commandArgs+=("$1")
+			    else
+				printf -v quotedSimpleCommand '%q ' "$@"
+				printf -v escapedFileMarker %q "$fileMarker"
+				commands="${quotedSimpleCommand//"$escapedFileMarker"/$fileMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
+				break
+			    fi
+			elif [ -z "$count" ] && [[ "$1" =~ ^[0-9]+$ ]]; then
+			    # Number means N'th recent file, but could also index into multiple results.
+			    count="$1"
+			    filespec="$(recallByNumber "$1")" || exit $?
+			else
+			    if [ -z "$1" ]; then
+				# Empty argument means first file, matcher done, following arguments are COMMAND-ARGS.
+				filespec="$(recallByNumber 1)" || exit $?
+			    elif [[ "$1" =~ ^[0-9]+$ ]]; then
+				printUsage >&2 "$0"
+				exit 2
+			    elif potentialFilespec="${FILERECALL_BASEDIR}/${subdir}${subdir:+/}${1}" && [ -r "$potentialFilespec" ] && [ ! -d "$potentialFilespec" ]
+			    then
+				# Take the full given NAME.
+				filespec="$potentialFilespec"
+			    elif type -t -- globmatch >/dev/null \
+				&& readarray -t filespecs < <(eval "globmatch --exclude-directories --files-matching \"*\${1}*\" \"\$FILERECALL_BASEDIR\"/${checkGlob}") \
+				&& [ ${#filespecs[@]} -eq 1 ]
+			    then
+				# Take a unique partial NAME.
+				filespec="${filespecs[0]}"
+			    elif [ -n "$count" -a -n "$commands" ]; then
+				# With a COMMAND, "N PATTERN" is not supported and instead interpreted as
+				# "N COMMAND-ARG"; you need to use "N -e PATTERN ;" instead.
+				commandArgs+=("$1")
+			    else
+				# Take the newest / N'th matching file.
+				filespec="$(recallGrep -e "$1")" || exit $?
+			    fi
+			    haveMatcher=t
+			fi
+			shift
+			;;
+    esac
+done
+if [ ${#grepArgs[@]} -gt 0 ]; then
+    filespec="$(recallGrep "${grepArgs[@]}")" || exit $?
+elif [ -z "$filespec" ] && [ -z "$count" ] && [ ! "$haveMatcher" ]; then
+    filespec="$(recallByNumber 1)" || exit $?
+fi
+if [ -z "$filespec" ]; then
+    printf >&2 'ERROR: No such %sfile.\n' "$what"
+    exit 1
+fi
+
+if [ -z "$commands" ]; then
+    printf -v commands '%q %s' "${PAGER:-less}" --RAW-CONTROL-CHARS
+fi
+if [ ${#commandArgs[@]} -gt 0 ]; then
+    printf -v quotedCommandArgs ' %q' "${commandArgs[@]}"
+    commands+="$quotedCommandArgs"
+fi
+
+interpolatedCommands="${commands//"$fileMarker"/$filespec}"
+typeset -a f=("$filespec")
+printf -v filespec '%q' "$filespec"
+interpolatedCommands="${commands//"$fileMarker"/$filespec}"
+[ "$interpolatedCommands" = "$commands" ] || f=()
+eval "$interpolatedCommands" '"${f[@]}"'
