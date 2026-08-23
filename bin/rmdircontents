@@ -62,7 +62,14 @@ do
 	*)		break;;
     esac
 done
-[ $# -gt 0 ] || set -- "$PWD"
+if [ $# -eq 0 ]; then
+    set -- "$PWD"
+    if [ ${#rmArgs[@]} -eq 0 ]; then
+	# Precaution: Add --interactive=always to avoid accidental removal of all files
+	# in the current directory.
+	rmArgs+=(--interactive=always)
+    fi
+fi
 
 typeset -a filespecs=()
 for dirspec
