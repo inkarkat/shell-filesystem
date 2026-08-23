@@ -15,18 +15,18 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "${FILERECALL_OFFER_SUBDIRS:+[-d|--directory SUBDIR] [-r|--recursive] }[-?|-h|--help] ..."
-    printf 'Usage: %q %s\n' "$(basename "$1")" '... [""|N|NAME|NAME-GLOB|[N] [GREP-ARGS ...] PATTERN]'
-    printf 'Usage: %q %s\n' "$(basename "$1")" "... -c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${FILERECALL_EXEC_END} [--exec ...] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN] [COMMAND-ARGS ...]"
-    printf 'Usage: %q %s\n' "$(basename "$1")" "... \"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"
-    printf 'Usage: %q %s\n' "$(basename "$1")" "... [-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${FILERECALL_EXEC_END} [--exec ...]] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN] -- SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "${FILERECALL_OFFER_SUBDIRS:+[-d|--directory SUBDIR] [-r|--recursive] }[-?|-h|--help] ..."
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" '... [""|N|NAME|NAME-GLOB|[N] [GREP-ARGS ...] PATTERN]'
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... -c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${FILERECALL_EXEC_END} [--exec ...] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN] [COMMAND-ARGS ...]"
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... \"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... [-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${FILERECALL_EXEC_END} [--exec ...]] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN] -- SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"
 }
 printUsage()
 {
     # This is the short help when launched with no or incorrect arguments.
     # It is printed to stderr to avoid accidental processing.
     printShortUsage "$1" >&2
-    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+    printf >&2 '\nTry %q --help for more information.\n' "${FILERECALL:-$(basename "$1")}"
 }
 printLongUsage()
 {
