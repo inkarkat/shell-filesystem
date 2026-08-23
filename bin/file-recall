@@ -3,6 +3,7 @@ set -o pipefail
 shopt -qs extglob nullglob
 
 : ${FILERECALL_BASEDIR:=.}
+: ${FILERECALL_OFFER_SUBDIRS=t}
 : ${FILERECALL_WHAT=}
 what="${FILERECALL_WHAT}${FILERECALL_WHAT:+ }"
 : ${FILERECALL_COMMAND_JOINER=;}
@@ -14,7 +15,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-d|--directory SUBDIR] [-r|--recursive] [-?|-h|--help] ...'
+    printf 'Usage: %q %s\n' "$(basename "$1")" "${FILERECALL_OFFER_SUBDIRS:+[-d|--directory SUBDIR] [-r|--recursive] }[-?|-h|--help] ..."
     printf 'Usage: %q %s\n' "$(basename "$1")" '... [""|N|NAME|NAME-GLOB|[N] [GREP-ARGS ...] PATTERN]'
     printf 'Usage: %q %s\n' "$(basename "$1")" "... -c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${FILERECALL_EXEC_END} [--exec ...] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN] [COMMAND-ARGS ...]"
     printf 'Usage: %q %s\n' "$(basename "$1")" "... \"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"
@@ -41,10 +42,12 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     echo
-    cat <<HELPTEXT
+    [ "$FILERECALL_OFFER_SUBDIRS" ] && cat <<HELPTEXT
     --directory|-d SUBDIR
 			Look for ${what}files in the SUBDIR subdirectory.
     --recursive|-r	Also look for ${what}files in subdirectories.
+HELPTEXT
+    cat <<HELPTEXT
     GREP-ARGS [...]	Recall the newest ${what}file whose contents are matched
 			by GREP-ARGS.
     --command|-c CMD	Execute CMD as a command-line. The recalled ${what}file
@@ -97,8 +100,8 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
-	--directory|-d)	shift; subdir="${1:?}"; shift;;
-	--recursive|-r)	glob='**'; shift;;
+	--directory|-d)	shift; [ "$FILERECALL_OFFER_SUBDIRS" ] && subdir="${1:?}"; shift;;
+	--recursive|-r)	[ "$FILERECALL_OFFER_SUBDIRS" ] && glob='**'; shift;;
 
 	--command|-c)	shift; commands+="${commands:+ $FILERECALL_COMMAND_JOINER }$1"; shift;;
 	--exec)		shift
