@@ -1,11 +1,31 @@
 #!/bin/bash
 shopt -qs nullglob
 
+readonly generalArgs='[-r|--recursive] [-f|--force] [-i|-I|--interactive[=WHEN]]]'
+getShortUsage()
+{
+    printf %s "$generalArgs"
+}
+getLongUsage()
+{
+    cat <<HELPTEXT
+    --recursive|-r	    Remove directories and their contents recursively.
+    --force|-f		    Ignore nonexistent files and arguments, never
+			    prompt.
+    -i			    Prompt before every removal.
+    -I			    Prompt once before removing more than three files,
+			    or  when  removing  recursively;  less intrusive
+			    than -i, while still giving protection against most
+			    mistakes.
+    --interactive[=WHEN]    Prompt according to WHEN: never, once (-I), or
+			    always (-i); without WHEN, prompt always.
+HELPTEXT
+}
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, they can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-r|--recursive] [-f|--force] [-i|-I|--interactive[=WHEN]]] [--] [DIRSPEC ...] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "$generalArgs [--] [DIRSPEC ...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -24,17 +44,9 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     echo
+    getLongUsage
+    echo
     cat <<HELPTEXT
-    --recursive|-r	    Remove directories and their contents recursively.
-    --force|-f		    Ignore nonexistent files and arguments, never
-			    prompt.
-    -i			    Prompt before every removal.
-    -I			    Prompt once before removing more than three files,
-			    or  when  removing  recursively;  less intrusive
-			    than -i, while still giving protection against most
-			    mistakes.
-    --interactive[=WHEN]    Prompt according to WHEN: never, once (-I), or
-			    always (-i); without WHEN, prompt always.
 SEE ALSO:
 - truncateDir can leave last / newest files behind, and prints by default,
   removes only if instructed.
@@ -52,6 +64,11 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--get-short-usage)
+			shift; getShortUsage "$@"; exit $?;;
+	--get-long-usage)
+			shift; getLongUsage "$@"; exit $?;;
+
 	--recursive|-r)	shift; rmArgs+=(--recursive); isRecursive=t;;
 	--dir|--force|-f|-i|-I|--interactive=*)
 			rmArgs+=("$1"); shift;;
