@@ -23,7 +23,7 @@ fileMarker="$FILERECALL_FILE_MARKER"; unset FILERECALL_FILE_MARKER
 
 getShortUsage()
 {
-    local -r query='""|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN'
+    local -r query='""|N|NAME|[N] NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN'
     local usageSep
     [ $# -gt 0 ] || set -- ''
     while [ $# -gt 0 ]
@@ -143,21 +143,54 @@ getFiles()
 	printf >&2 'ERROR: No %s%s in %s\n' "$where" "$whatPlural" "$searchDirspec"
 	exit 2
     fi
+
+    getFiles() { :; }
+}
+
+recallByName()
+{
+    ${DEBUG:+dump-args --on-debug -a recallByName -- "$@"}
+    local potentialFilespec matchedFilespecs
+    for potentialFilespec in "${filespecs[@]}"
+    do
+	if [[ "/$potentialFilespec" = *"/${subdir}${subdir:+/}${1}" ]]; then
+	    # Take the full given NAME.
+	    printf %s "$potentialFilespec"
+	    return 0
+	fi
+    done
+
+    if type -t -- globmatch >/dev/null \
+	&& readarray -t matchedFilespecs < <(globmatch --exclude-directories --files-matching "*${1}*" "${filespecs[@]}")
+    then
+	if [ -n "$count" ] && [ ${#matchedFilespecs[@]} -ge $count ]; then
+	    # Take the N'th partial NAME.
+	    printf %s "${matchedFilespecs[$((count - 1))]}"
+	    return 0
+	elif [ ${#matchedFilespecs[@]} -eq 1 ]; then
+	    # Take a unique partial NAME.
+	    printf %s "${matchedFilespecs[0]}"
+	    return 0
+	elif [ ${#matchedFilespecs[@]} -gt 1 ]; then
+	    printf >&2 'There are %s%d %s matching "%s".\n' "${count:+only }" "${#matchedFilespecs[@]}" "$whatPlural" "$1"
+	fi
+    fi
+    return 1
 }
 
 recallByNumber()
 {
-    getFiles \
-	&& printf %s "${filespecs[${1:?} - 1]}"
+    ${DEBUG:+dump-args --on-debug -a recallByNumber -- "$@"}
+    printf %s "${filespecs[${1:?} - 1]}"
 }
 
 recallGrep()
 {
+    ${DEBUG:+dump-args --on-debug -a recallGrep -- "$@"}
     # Note: Cannot simply use $FILERECALL_BASEDIR/* glob here because we want to
     # return a match in the newest file (and now support a catalog file).
-    getFiles \
-	&& grep --no-messages --files-with-matches --directories=skip "$@" -- "${filespecs[@]}" \
-	    | sed -ne "${count:-1}p"
+    grep --no-messages --files-with-matches --directories=skip "$@" -- "${filespecs[@]}" \
+	| sed -ne "${count:-1}p"
 }
 
 catalogFilespec=
@@ -218,7 +251,8 @@ do
 			commands+="${commands:+ $FILERECALL_COMMAND_JOINER }${quotedSimpleCommand//"$escapedFileMarker"/$fileMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
 			break
 			;;
-	*)		checkGlob="$glob"; [[ "$1" =~ / ]] && checkGlob='**'
+	*)		getFiles
+			checkGlob="$glob"; [[ "$1" =~ / ]] && checkGlob='**'
 			if [ ${#grepArgs[@]} -gt 0 ] && [ ! "$haveMatcher" ]; then
 			    # We have GREP-ARGS, but no PATTERN yet; this is the PATTERN.
 			    grepArgs+=("$1")
@@ -233,7 +267,8 @@ do
 				break
 			    fi
 			elif [ -z "$count" ] && [[ "$1" =~ ^[0-9]+$ ]]; then
-			    # Number means N'th recent file, but could also index into multiple results.
+			    # Number means N'th recent file, but could also index into multiple NAME-GLOB
+			    # / grep results.
 			    count="$1"
 			    filespec="$(recallByNumber "$1")" || exit $?
 			else
@@ -243,16 +278,8 @@ do
 			    elif [[ "$1" =~ ^[0-9]+$ ]]; then
 				printUsage >&2 "$0"
 				exit 2
-			    elif potentialFilespec="${FILERECALL_BASEDIR}/${subdir}${subdir:+/}${1}" && [ -r "$potentialFilespec" ] && [ ! -d "$potentialFilespec" ]
-			    then
-				# Take the full given NAME.
-				filespec="$potentialFilespec"
-			    elif type -t -- globmatch >/dev/null \
-				&& readarray -t filespecs < <(eval "globmatch --exclude-directories --files-matching \"*\${1}*\" \"\$FILERECALL_BASEDIR\"/${checkGlob}") \
-				&& [ ${#filespecs[@]} -eq 1 ]
-			    then
-				# Take a unique partial NAME.
-				filespec="${filespecs[0]}"
+			    elif filespec="$(recallByName "$1")"; then
+				:
 			    elif [ -n "$count" -a -n "$commands" ]; then
 				# With a COMMAND, "N PATTERN" is not supported and instead interpreted as
 				# "N COMMAND-ARG"; you need to use "N -e PATTERN ;" instead.
@@ -267,6 +294,7 @@ do
 			;;
     esac
 done
+getFiles
 if [ ${#grepArgs[@]} -gt 0 ]; then
     filespec="$(recallGrep "${grepArgs[@]}")" || exit $?
 elif [ -z "$filespec" ] && [ -z "$count" ] && [ ! "$haveMatcher" ]; then
