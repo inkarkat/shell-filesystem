@@ -15,7 +15,10 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "${FILERECALL_OFFER_SUBDIRS:+[-d|--directory SUBDIR] [-r|--recursive] }[-?|-h|--help] ..."
+    [ "$FILERECALL_OFFER_SUBDIRS" ] \
+	&& local sourceArgs='[-d|--directory SUBDIR] [-r|--recursive]' \
+	|| local sourceArgs='[--catalog CATALOG-FILE]'
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "$sourceArgs [-?|-h|--help] ..."
     printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" '... [""|N|NAME|NAME-GLOB|[N] [GREP-ARGS ...] PATTERN]'
     printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... -c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${FILERECALL_EXEC_END} [--exec ...] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN] [COMMAND-ARGS ...]"
     printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... \"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"
@@ -42,11 +45,19 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     echo
-    [ "$FILERECALL_OFFER_SUBDIRS" ] && cat <<HELPTEXT
+    if [ "$FILERECALL_OFFER_SUBDIRS" ]; then
+	cat <<HELPTEXT
     --directory|-d SUBDIR
 			Look for ${what}files in the SUBDIR subdirectory.
     --recursive|-r	Also look for ${what}files in subdirectories.
 HELPTEXT
+    else
+	cat <<HELPTEXT
+    --catalog CATALOG-FILE
+			Look for ${what}files as listed in CATALOG-FILE
+			(one filespec per line) instead of the current location.
+HELPTEXT
+    fi
     cat <<HELPTEXT
     GREP-ARGS [...]	Recall the newest ${what}file whose contents
 			are matched by GREP-ARGS.
@@ -64,12 +75,16 @@ HELPTEXT
 typeset -a filespecs=()
 getFiles()
 {
-    local searchDirspec="${FILERECALL_BASEDIR}${subdir:+/$subdir}"
+    if [ -n "$catalogFilespec" ]; then
+	readarray -t filespecs <"$catalogFilespec"
+    else
+	local searchDirspec="${FILERECALL_BASEDIR}${subdir:+/$subdir}"
 
-    while IFS=$'\n' read -r filespec
-    do
-	[ -d "$filespec" ] || filespecs+=("$filespec")
-    done < <(eval "ls -d -t \"\${searchDirspec}\"/${glob}")
+	while IFS=$'\n' read -r filespec
+	do
+	    [ -d "$filespec" ] || filespecs+=("$filespec")
+	done < <(eval "ls -d -t \"\${searchDirspec}\"/${glob}")
+    fi
 
     if [ ${#filespecs[@]} -eq 0 ]; then
 	printf >&2 'ERROR: No %sfiles in %s\n' "$what" "$searchDirspec"
@@ -85,12 +100,14 @@ recallByNumber()
 
 recallGrep()
 {
-    # Note: Cannot simply use $FILERECALL_BASEDIR/* glob here because we want to return a match in the newest file.
+    # Note: Cannot simply use $FILERECALL_BASEDIR/* glob here because we want to
+    # return a match in the newest file (and now support a catalog file).
     getFiles \
 	&& grep --no-messages --files-with-matches --directories=skip "$@" -- "${filespecs[@]}" \
 	    | sed -ne "${count:-1}p"
 }
 
+catalogFilespec=
 subdir=
 glob='*'
 commands=
@@ -103,6 +120,7 @@ do
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--directory|-d)	shift; [ "$FILERECALL_OFFER_SUBDIRS" ] && subdir="${1:?}"; shift;;
 	--recursive|-r)	[ "$FILERECALL_OFFER_SUBDIRS" ] && glob='**'; shift;;
+	--catalog)	shift; catalogFilespec="${1:?}"; shift; FILERECALL_OFFER_SUBDIRS='';;
 
 	--command|-c)	shift; commands+="${commands:+ $FILERECALL_COMMAND_JOINER }$1"; shift;;
 	--exec)		shift
