@@ -147,14 +147,19 @@ getFiles()
 
 recallByName()
 {
+    getFiles || return $?
+
     local potentialFilespec matchedFilespecs
-    if potentialFilespec="${FILERECALL_BASEDIR}/${subdir}${subdir:+/}${1}" \
-	&& [ -r "$potentialFilespec" ] && [ ! -d "$potentialFilespec" ]
-    then
-	# Take the full given NAME.
-	printf %s "$potentialFilespec"
-    elif type -t -- globmatch >/dev/null \
-	&& readarray -t matchedFilespecs < <(eval "globmatch --exclude-directories --files-matching \"*\${1}*\" \"\$FILERECALL_BASEDIR\"/${checkGlob}") \
+    for potentialFilespec in "${filespecs[@]}"
+    do
+	if [[ "/$potentialFilespec" = *"/${subdir}${subdir:+/}${1}" ]]; then
+	    # Take the full given NAME.
+	    printf %s "$potentialFilespec"
+	    return 0
+	fi
+    done
+    if type -t -- globmatch >/dev/null \
+	&& readarray -t matchedFilespecs < <(globmatch --exclude-directories --files-matching "*${1}*" "${filespecs[@]}") \
 	&& [ ${#matchedFilespecs[@]} -eq 1 ]
     then
 	# Take a unique partial NAME.
