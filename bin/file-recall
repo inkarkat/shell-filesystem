@@ -4,8 +4,18 @@ shopt -qs extglob nullglob
 
 : ${FILERECALL_BASEDIR:=.}
 : ${FILERECALL_OFFER_SUBDIRS=t}
-: ${FILERECALL_WHAT=}
-what="${FILERECALL_WHAT}${FILERECALL_WHAT:+ }"
+: ${FILERECALL_WHAT=file}
+: ${FILERECALL_WHERE=}
+
+case "$FILERECALL_WHAT" in
+    *,*)    what="${FILERECALL_WHAT%%,*}"
+	    whatPlural="${FILERECALL_WHAT#*,}"
+	    ;;
+    *)	    what="$FILERECALL_WHAT"
+	    whatPlural="${FILERECALL_WHAT}s"
+	    ;;
+esac
+where="${FILERECALL_WHERE}${FILERECALL_WHERE:+ }"
 : ${FILERECALL_COMMAND_JOINER=;}
 : ${FILERECALL_EXEC_END=;}
 : ${FILERECALL_FILE_MARKER='{}'}
@@ -51,27 +61,27 @@ getLongUsage()
 		if [ "$FILERECALL_OFFER_SUBDIRS" ]; then
 		    cat <<HELPTEXT
     --directory|-d SUBDIR
-			Look for ${what}files in the SUBDIR subdirectory.
-    --recursive|-r	Also look for ${what}files in subdirectories.
+			Look for ${where}${whatPlural} in the SUBDIR subdirectory.
+    --recursive|-r	Also look for ${where}${whatPlural} in subdirectories.
 HELPTEXT
 		else
 		    cat <<HELPTEXT
     --catalog CATALOG-FILE
-			Look for ${what}files as listed in CATALOG-FILE
+			Look for ${where}${whatPlural} as listed in CATALOG-FILE
 			(one filespec per line) instead of the current location.
 HELPTEXT
 		fi
 		;;&
 	    ''|query)
 		cat <<HELPTEXT
-    GREP-ARGS [...]	Recall the newest ${what}file whose contents
+    GREP-ARGS [...]	Recall the newest ${where}${what} whose contents
 			are matched by GREP-ARGS.
     --command|-c CMD	Execute CMD as a command-line. The recalled
-			${what}file ${fileMarker:+either }is appended${fileMarker:+ or replaces
+			${where}${what} ${fileMarker:+either }is appended${fileMarker:+ or replaces
 			any $fileMarker marker} inside COMMANDLINE.
     --exec CMD [...] ${FILERECALL_EXEC_END}	Execute CMD; all following arguments are taken to be
 			arguments to the CMD until an argument consisting of
-			'${FILERECALL_EXEC_END}' is encountered. The recalled ${what}file
+			'${FILERECALL_EXEC_END}' is encountered. The recalled ${where}${what}
 			${fileMarker:+either }is appended${fileMarker:+ or replaces any $fileMarker marker} inside
 			COMMANDLINE.
 HELPTEXT
@@ -103,8 +113,8 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Recall previous N'th file from the ${what:-current }location, or the one where the
-file name is NAME / contains *NAME-GLOB*, or the latest one where the contents
+Recall previous N'th $what from the ${where:-current }location, or the one where the
+$what name is NAME / contains *NAME-GLOB*, or the latest one where the contents
 match (grep-style) PATTERN / GREP-ARGS.
 The output is shown in the pager, or its filespec is ${fileMarker:+either }appended to${fileMarker:+ or
 replaces any $fileMarker marker inside} COMMANDLINE (and possibly passed COMMAND-ARGS).
@@ -130,7 +140,7 @@ getFiles()
     fi
 
     if [ ${#filespecs[@]} -eq 0 ]; then
-	printf >&2 'ERROR: No %sfiles in %s\n' "$what" "$searchDirspec"
+	printf >&2 'ERROR: No %s%s in %s\n' "$where" "$whatPlural" "$searchDirspec"
 	exit 2
     fi
 }
@@ -263,7 +273,7 @@ elif [ -z "$filespec" ] && [ -z "$count" ] && [ ! "$haveMatcher" ]; then
     filespec="$(recallByNumber 1)" || exit $?
 fi
 if [ -z "$filespec" ]; then
-    printf >&2 'ERROR: No such %sfile.\n' "$what"
+    printf >&2 'ERROR: No such %s%s.\n' "$where" "$what"
     exit 1
 fi
 
