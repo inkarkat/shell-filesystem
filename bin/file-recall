@@ -143,12 +143,12 @@ getFiles()
 	printf >&2 'ERROR: No %s%s in %s\n' "$where" "$whatPlural" "$searchDirspec"
 	exit 2
     fi
+
+    getFiles() { :; }
 }
 
 recallByName()
 {
-    getFiles || return $?
-
     local potentialFilespec matchedFilespecs
     for potentialFilespec in "${filespecs[@]}"
     do
@@ -171,17 +171,15 @@ recallByName()
 
 recallByNumber()
 {
-    getFiles \
-	&& printf %s "${filespecs[${1:?} - 1]}"
+    printf %s "${filespecs[${1:?} - 1]}"
 }
 
 recallGrep()
 {
     # Note: Cannot simply use $FILERECALL_BASEDIR/* glob here because we want to
     # return a match in the newest file (and now support a catalog file).
-    getFiles \
-	&& grep --no-messages --files-with-matches --directories=skip "$@" -- "${filespecs[@]}" \
-	    | sed -ne "${count:-1}p"
+    grep --no-messages --files-with-matches --directories=skip "$@" -- "${filespecs[@]}" \
+	| sed -ne "${count:-1}p"
 }
 
 catalogFilespec=
@@ -242,7 +240,8 @@ do
 			commands+="${commands:+ $FILERECALL_COMMAND_JOINER }${quotedSimpleCommand//"$escapedFileMarker"/$fileMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
 			break
 			;;
-	*)		checkGlob="$glob"; [[ "$1" =~ / ]] && checkGlob='**'
+	*)		getFiles
+			checkGlob="$glob"; [[ "$1" =~ / ]] && checkGlob='**'
 			if [ ${#grepArgs[@]} -gt 0 ] && [ ! "$haveMatcher" ]; then
 			    # We have GREP-ARGS, but no PATTERN yet; this is the PATTERN.
 			    grepArgs+=("$1")
@@ -283,6 +282,7 @@ do
 			;;
     esac
 done
+getFiles
 if [ ${#grepArgs[@]} -gt 0 ]; then
     filespec="$(recallGrep "${grepArgs[@]}")" || exit $?
 elif [ -z "$filespec" ] && [ -z "$count" ] && [ ! "$haveMatcher" ]; then
