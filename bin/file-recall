@@ -145,6 +145,25 @@ getFiles()
     fi
 }
 
+recallByName()
+{
+    local potentialFilespec matchedFilespecs
+    if potentialFilespec="${FILERECALL_BASEDIR}/${subdir}${subdir:+/}${1}" \
+	&& [ -r "$potentialFilespec" ] && [ ! -d "$potentialFilespec" ]
+    then
+	# Take the full given NAME.
+	printf %s "$potentialFilespec"
+    elif type -t -- globmatch >/dev/null \
+	&& readarray -t matchedFilespecs < <(eval "globmatch --exclude-directories --files-matching \"*\${1}*\" \"\$FILERECALL_BASEDIR\"/${checkGlob}") \
+	&& [ ${#matchedFilespecs[@]} -eq 1 ]
+    then
+	# Take a unique partial NAME.
+	printf %s "${matchedFilespecs[0]}"
+    else
+	return 1
+    fi
+}
+
 recallByNumber()
 {
     getFiles \
@@ -243,16 +262,8 @@ do
 			    elif [[ "$1" =~ ^[0-9]+$ ]]; then
 				printUsage >&2 "$0"
 				exit 2
-			    elif potentialFilespec="${FILERECALL_BASEDIR}/${subdir}${subdir:+/}${1}" && [ -r "$potentialFilespec" ] && [ ! -d "$potentialFilespec" ]
-			    then
-				# Take the full given NAME.
-				filespec="$potentialFilespec"
-			    elif type -t -- globmatch >/dev/null \
-				&& readarray -t filespecs < <(eval "globmatch --exclude-directories --files-matching \"*\${1}*\" \"\$FILERECALL_BASEDIR\"/${checkGlob}") \
-				&& [ ${#filespecs[@]} -eq 1 ]
-			    then
-				# Take a unique partial NAME.
-				filespec="${filespecs[0]}"
+			    elif filespec="$(recallByName "$1")"; then
+				:
 			    elif [ -n "$count" -a -n "$commands" ]; then
 				# With a COMMAND, "N PATTERN" is not supported and instead interpreted as
 				# "N COMMAND-ARG"; you need to use "N -e PATTERN ;" instead.
