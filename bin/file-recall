@@ -147,41 +147,50 @@ getFiles()
     getFiles() { :; }
 }
 
-recallByName()
+matchers=''
+filterByName()
 {
-    ${DEBUG:+dump-args --on-debug -a recallByName -- "$@"}
-    local potentialFilespec matchedFilespecs
+    ${DEBUG:+dump-args --on-debug -a filterByName -- "$@"}
+
+    local potentialFilespec
+    typeset -a matchedFilespecs=()
     for potentialFilespec in "${filespecs[@]}"
     do
 	if [[ "/$potentialFilespec" = *"/${subdir}${subdir:+/}${1}" ]]; then
 	    # Take the full given NAME.
-	    printf %s "$potentialFilespec"
-	    return 0
+	    matchedFilespecs+=("$potentialFilespec")
 	fi
     done
 
-    if type -t -- globmatch >/dev/null \
-	&& readarray -t matchedFilespecs < <(globmatch --exclude-directories --files-matching "*${1}*" "${filespecs[@]}")
-    then
-	if [ -n "$count" ] && [ ${#matchedFilespecs[@]} -ge $count ]; then
-	    # Take the N'th partial NAME.
-	    printf %s "${matchedFilespecs[$((count - 1))]}"
-	    return 0
-	elif [ ${#matchedFilespecs[@]} -eq 1 ]; then
-	    # Take a unique partial NAME.
-	    printf %s "${matchedFilespecs[0]}"
-	    return 0
-	elif [ ${#matchedFilespecs[@]} -gt 1 ]; then
-	    printf >&2 'There are %s%d %s matching "%s".\n' "${count:+only }" "${#matchedFilespecs[@]}" "$whatPlural" "$1"
-	fi
+    if [ ${#matchedFilespecs[@]} -gt 0 ]; then
+	matchers+="${matchers:+ and} where NAME is $1"
+    elif type -t -- globmatch >/dev/null; then
+	readarray -t matchedFilespecs < <(globmatch --exclude-directories --files-matching "*${1}*" "${filespecs[@]}")
+	matchers+="${matchers:+ and} where NAME matches \"$1\""
+    else
+	matchers+="${matchers:+ and} where NAME is $1"
     fi
-    return 1
+
+    [ ${#matchedFilespecs[@]} -gt 0 ] \
+	|| return 1
+    filespecs=("${matchedFilespecs[@]}")
 }
 
 recallByNumber()
 {
-    ${DEBUG:+dump-args --on-debug -a recallByNumber -- "$@"}
-    printf %s "${filespecs[${1:?} - 1]}"
+    if [ -n "$count" ] && [ ${#filespecs[@]} -ge $count ]; then
+	# Take the N'th result.
+	printf %s "${filespecs[$((count - 1))]}"
+	return 0
+    elif [ ${#filespecs[@]} -eq 1 ]; then
+	# Take a unique result.
+	printf %s "${filespecs[0]}"
+	return 0
+    elif [ ${#filespecs[@]} -gt 1 ]; then
+	printf >&2 'There are %s%d %s%s.\n' "${count:+only }" "${#filespecs[@]}" "$whatPlural" "$matchers"
+    elif [ ${#filespecs[@]} -eq 0 ]; then
+	printf >&2 'There are no %s%s.\n' "$whatPlural" "${matchers// and / or }"
+    fi
 }
 
 recallGrep()
@@ -270,15 +279,14 @@ do
 			    # Number means N'th recent file, but could also index into multiple NAME-GLOB
 			    # / grep results.
 			    count="$1"
-			    filespec="$(recallByNumber "$1")" || exit $?
 			else
 			    if [ -z "$1" ]; then
 				# Empty argument means first file, matcher done, following arguments are COMMAND-ARGS.
-				filespec="$(recallByNumber 1)" || exit $?
+				:
 			    elif [[ "$1" =~ ^[0-9]+$ ]]; then
 				printUsage >&2 "$0"
 				exit 2
-			    elif filespec="$(recallByName "$1")"; then
+			    elif filterByName "$1"; then
 				:
 			    elif [ -n "$count" -a -n "$commands" ]; then
 				# With a COMMAND, "N PATTERN" is not supported and instead interpreted as
@@ -286,7 +294,7 @@ do
 				commandArgs+=("$1")
 			    else
 				# Take the newest / N'th matching file.
-				filespec="$(recallGrep -e "$1")" || exit $?
+				grepArgs+=(-e "$1")
 			    fi
 			    haveMatcher=t
 			fi
@@ -294,11 +302,14 @@ do
 			;;
     esac
 done
+
 getFiles
 if [ ${#grepArgs[@]} -gt 0 ]; then
     filespec="$(recallGrep "${grepArgs[@]}")" || exit $?
-elif [ -z "$filespec" ] && [ -z "$count" ] && [ ! "$haveMatcher" ]; then
-    filespec="$(recallByNumber 1)" || exit $?
+elif [ -z "$count" ] && [ ! "$haveMatcher" ]; then
+    filespec="$(count=1 recallByNumber)"
+else
+    filespec="$(recallByNumber)"
 fi
 if [ -z "$filespec" ]; then
     printf >&2 'ERROR: No such %s%s.\n' "$where" "$what"
