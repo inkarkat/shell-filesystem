@@ -149,6 +149,7 @@ getFiles()
 
 recallByName()
 {
+    ${DEBUG:+dump-args --on-debug -a recallByName -- "$@"}
     local potentialFilespec matchedFilespecs
     for potentialFilespec in "${filespecs[@]}"
     do
@@ -171,11 +172,13 @@ recallByName()
 
 recallByNumber()
 {
+    ${DEBUG:+dump-args --on-debug -a recallByNumber -- "$@"}
     printf %s "${filespecs[${1:?} - 1]}"
 }
 
 recallGrep()
 {
+    ${DEBUG:+dump-args --on-debug -a recallGrep -- "$@"}
     # Note: Cannot simply use $FILERECALL_BASEDIR/* glob here because we want to
     # return a match in the newest file (and now support a catalog file).
     grep --no-messages --files-with-matches --directories=skip "$@" -- "${filespecs[@]}" \
