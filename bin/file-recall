@@ -23,7 +23,7 @@ fileMarker="$FILERECALL_FILE_MARKER"; unset FILERECALL_FILE_MARKER
 
 getShortUsage()
 {
-    local -r query='""|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN'
+    local -r query='""|N|NAME|[N] NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN'
     local usageSep
     [ $# -gt 0 ] || set -- ''
     while [ $# -gt 0 ]
@@ -159,15 +159,23 @@ recallByName()
 	    return 0
 	fi
     done
+
     if type -t -- globmatch >/dev/null \
-	&& readarray -t matchedFilespecs < <(globmatch --exclude-directories --files-matching "*${1}*" "${filespecs[@]}") \
-	&& [ ${#matchedFilespecs[@]} -eq 1 ]
+	&& readarray -t matchedFilespecs < <(globmatch --exclude-directories --files-matching "*${1}*" "${filespecs[@]}")
     then
-	# Take a unique partial NAME.
-	printf %s "${matchedFilespecs[0]}"
-    else
-	return 1
+	if [ -n "$count" ] && [ ${#matchedFilespecs[@]} -ge $count ]; then
+	    # Take the N'th partial NAME.
+	    printf %s "${matchedFilespecs[$((count - 1))]}"
+	    return 0
+	elif [ ${#matchedFilespecs[@]} -eq 1 ]; then
+	    # Take a unique partial NAME.
+	    printf %s "${matchedFilespecs[0]}"
+	    return 0
+	elif [ ${#matchedFilespecs[@]} -gt 1 ]; then
+	    printf >&2 'There are %s%d %s matching "%s".\n' "${count:+only }" "${#matchedFilespecs[@]}" "$whatPlural" "$1"
+	fi
     fi
+    return 1
 }
 
 recallByNumber()
@@ -259,7 +267,8 @@ do
 				break
 			    fi
 			elif [ -z "$count" ] && [[ "$1" =~ ^[0-9]+$ ]]; then
-			    # Number means N'th recent file, but could also index into multiple results.
+			    # Number means N'th recent file, but could also index into multiple NAME-GLOB
+			    # / grep results.
 			    count="$1"
 			    filespec="$(recallByNumber "$1")" || exit $?
 			else
