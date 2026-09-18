@@ -11,18 +11,85 @@ what="${FILERECALL_WHAT}${FILERECALL_WHAT:+ }"
 : ${FILERECALL_FILE_MARKER='{}'}
 fileMarker="$FILERECALL_FILE_MARKER"; unset FILERECALL_FILE_MARKER
 
+getShortUsage()
+{
+    local -r query='""|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN'
+    local usageSep
+    [ $# -gt 0 ] || set -- ''
+    while [ $# -gt 0 ]
+    do
+	local hadTopic=
+	case "$1" in
+	    ''|input)
+		[ "$FILERECALL_OFFER_SUBDIRS" ] \
+		    && printf %s "${usageSep}${hadTopic:+ }" '[-d|--directory SUBDIR] [-r|--recursive]' \
+		    || printf %s "${usageSep}${hadTopic:+ }" '[--catalog CATALOG-FILE]'
+		hadTopic=t
+		;;&
+	    ''|query1)
+		printf %s "${usageSep}${hadTopic:+ }" "[${query}]"; hadTopic=t;;&
+	    ''|query2)
+		printf %s "${usageSep}${hadTopic:+ }" "-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${FILERECALL_EXEC_END} [--exec ...] [${query}] [COMMAND-ARGS ...]"; hadTopic=t;;&
+	    ''|query3)
+		printf %s "${usageSep}${hadTopic:+ }" "${query} SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"; hadTopic=t;;&
+	    ''|query4)
+		printf %s "${usageSep}${hadTopic:+ }" "[-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${FILERECALL_EXEC_END} [--exec ...]] [${query}] -- SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"; hadTopic=t;;&
+	    *)  [ "$hadTopic" ] || { echo "ERROR: Unknown short usage topic \"$1\"!" >&2; return 2; };;
+	esac
+	shift; usageSep=' '
+    done
+}
+getLongUsage()
+{
+    [ $# -gt 0 ] || set -- ''
+    while [ $# -gt 0 ]
+    do
+	local topic="$1"; shift
+	local hadTopic=
+	case "$topic" in
+	    ''|input)
+		if [ "$FILERECALL_OFFER_SUBDIRS" ]; then
+		    cat <<HELPTEXT
+    --directory|-d SUBDIR
+			Look for ${what}files in the SUBDIR subdirectory.
+    --recursive|-r	Also look for ${what}files in subdirectories.
+HELPTEXT
+		else
+		    cat <<HELPTEXT
+    --catalog CATALOG-FILE
+			Look for ${what}files as listed in CATALOG-FILE
+			(one filespec per line) instead of the current location.
+HELPTEXT
+		fi
+		;;&
+	    ''|query)
+		cat <<HELPTEXT
+    GREP-ARGS [...]	Recall the newest ${what}file whose contents
+			are matched by GREP-ARGS.
+    --command|-c CMD	Execute CMD as a command-line. The recalled
+			${what}file ${fileMarker:+either }is appended${fileMarker:+ or replaces
+			any $fileMarker marker} inside COMMANDLINE.
+    --exec CMD [...] ${FILERECALL_EXEC_END}	Execute CMD; all following arguments are taken to be
+			arguments to the CMD until an argument consisting of
+			'${FILERECALL_EXEC_END}' is encountered. The recalled ${what}file
+			${fileMarker:+either }is appended${fileMarker:+ or replaces any $fileMarker marker} inside
+			COMMANDLINE.
+HELPTEXT
+		hadTopic=t
+		;;&
+	    *)  [ "$hadTopic" ] || { echo "ERROR: Unknown long usage topic \"$topic\"!" >&2; return 2; };;
+	esac
+    done
+}
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    [ "$FILERECALL_OFFER_SUBDIRS" ] \
-	&& local sourceArgs='[-d|--directory SUBDIR] [-r|--recursive]' \
-	|| local sourceArgs='[--catalog CATALOG-FILE]'
-    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "$sourceArgs [-?|-h|--help] ..."
-    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" '... [""|N|NAME|NAME-GLOB|[N] [GREP-ARGS ...] PATTERN]'
-    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... -c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${FILERECALL_EXEC_END} [--exec ...] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN] [COMMAND-ARGS ...]"
-    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... \"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"
-    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... [-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${FILERECALL_EXEC_END} [--exec ...]] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN] -- SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "$(getShortUsage input) [-?|-h|--help] ..."
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... $(getShortUsage query1)"
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... $(getShortUsage query2)"
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... $(getShortUsage query3)"
+    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... $(getShortUsage query4)"
 }
 printUsage()
 {
@@ -45,31 +112,7 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     echo
-    if [ "$FILERECALL_OFFER_SUBDIRS" ]; then
-	cat <<HELPTEXT
-    --directory|-d SUBDIR
-			Look for ${what}files in the SUBDIR subdirectory.
-    --recursive|-r	Also look for ${what}files in subdirectories.
-HELPTEXT
-    else
-	cat <<HELPTEXT
-    --catalog CATALOG-FILE
-			Look for ${what}files as listed in CATALOG-FILE
-			(one filespec per line) instead of the current location.
-HELPTEXT
-    fi
-    cat <<HELPTEXT
-    GREP-ARGS [...]	Recall the newest ${what}file whose contents
-			are matched by GREP-ARGS.
-    --command|-c CMD	Execute CMD as a command-line. The recalled
-			${what}file ${fileMarker:+either }is appended${fileMarker:+ or replaces
-			any $fileMarker marker} inside COMMANDLINE.
-    --exec CMD [...] ${FILERECALL_EXEC_END}	Execute CMD; all following arguments are taken to be
-			arguments to the CMD until an argument consisting of
-			'${FILERECALL_EXEC_END}' is encountered. The recalled ${what}file
-			${fileMarker:+either }is appended${fileMarker:+ or replaces any $fileMarker marker} inside
-			COMMANDLINE.
-HELPTEXT
+    getLongUsage ''
 }
 
 typeset -a filespecs=()
@@ -118,6 +161,11 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--get-short-usage)
+			shift; getShortUsage "$@"; exit $?;;
+	--get-long-usage)
+			shift; getLongUsage "$@"; exit $?;;
+
 	--directory|-d)	shift; [ "$FILERECALL_OFFER_SUBDIRS" ] && subdir="${1:?}"; shift;;
 	--recursive|-r)	[ "$FILERECALL_OFFER_SUBDIRS" ] && glob='**'; shift;;
 	--catalog)	shift; catalogFilespec="${1:?}"; shift; FILERECALL_OFFER_SUBDIRS='';;
