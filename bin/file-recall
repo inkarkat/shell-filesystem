@@ -2,6 +2,8 @@
 set -o pipefail
 shopt -qs extglob nullglob
 
+${DEBUG:+eval $(debugtrace -o $- -- "$@")}
+
 : ${FILERECALL_BASEDIR:=.}
 : ${FILERECALL_OFFER_SUBDIRS=t}
 : ${FILERECALL_WHAT=file}
@@ -23,7 +25,8 @@ fileMarker="$FILERECALL_FILE_MARKER"; unset FILERECALL_FILE_MARKER
 
 getShortUsage()
 {
-    local -r query='""|N|[N] NAME|[N] NAME-GLOB|[N] PATTERN|[N] GREP-ARGS ... PATTERN|[N] [NAME|NAME-GLOB] [GREP-ARGS ...] -e|--regexp PATTERN|-f|--file FILE'
+    local -r SELECTION="$(commandOnSelected --get-short-usage selection 2>/dev/null)"
+    local -r query="GREP-ARGS [...] [NAME|NAME-GLOB] [$SELECTION ...]|(NAME|NAME-GLOB|PATTERN) [$SELECTION ...]|$SELECTION ...|"""
     local usageSep
     [ $# -gt 0 ] || set -- ''
     while [ $# -gt 0 ]
@@ -85,6 +88,7 @@ HELPTEXT
 			${fileMarker:+either }is appended${fileMarker:+ or replaces any $fileMarker marker} inside
 			COMMANDLINE.
 HELPTEXT
+		commandOnSelected --get-long-usage selection 2>/dev/null
 		hadTopic=t
 		;;&
 	    *)  [ "$hadTopic" ] || { echo "ERROR: Unknown long usage topic \"$topic\"!" >&2; return 2; };;
@@ -96,6 +100,7 @@ printShortUsage()
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
     printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "$(getShortUsage input) [-?|-h|--help] ..."
+    echo
     printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... $(getShortUsage query1)"
     printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... $(getShortUsage query2)"
     printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... $(getShortUsage query3)"
@@ -113,7 +118,7 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Recall previous N'th $what from the ${where:-current }location, or the one where the
+Recall ${what}(s) from the ${where:-current }location, or the one where the
 $what name is NAME / contains *NAME-GLOB*, or the latest one where the contents
 match (grep-style) PATTERN / GREP-ARGS.
 The output is shown in the pager, or its filespec is ${fileMarker:+either }appended to${fileMarker:+ or
@@ -123,11 +128,12 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     getLongUsage ''
+    echo
     cat <<HELPTEXT
 EXIT STATUS:
     0	Complete success.
     2	Bad invocation, wrong or missing command-line arguments.
-    4	The passed N exceeds the available ${whatPlural}.
+    4	No results from filtering / nothing selected.
     *	Any exit status from COMMAND(s).
 HELPTEXT
 }
@@ -155,6 +161,15 @@ getFiles()
 }
 
 matchers=''
+nonMatchers=''
+ensureResults()
+{
+    [ ${#filespecs[@]} -eq 0 ] || return 0
+
+    printf >&2 'There are no %s%s.\n' "$whatPlural" "$nonMatchers"
+    return 1
+}
+
 filterByName()
 {
     ${DEBUG:+dump-args --on-debug -a filterByName -- "$@" -- "${filespecs[@]}"}
@@ -173,13 +188,15 @@ filterByName()
 	matchers+="${matchers:+ and} where NAME is $1"
     elif type -t -- globmatch >/dev/null; then
 	readarray -t matchedFilespecs < <(globmatch --exclude-directories --files-matching "*${1}*" "${filespecs[@]}")
-	matchers+="${matchers:+ and} where NAME matches \"$1\""
-    else
-	matchers+="${matchers:+ and} where NAME is $1"
+	[ ${#matchedFilespecs[@]} -gt 0 ] \
+	    && matchers+="${matchers:+ and} where NAME matches \"$1\""
     fi
 
-    [ ${#matchedFilespecs[@]} -gt 0 ] \
-	|| return 1
+    if [ ${#matchedFilespecs[@]} -eq 0 ]; then
+	nonMatchers+="${nonMatchers:+ or} where NAME matches \"$1\""
+	return 1
+    fi
+
     filespecs=("${matchedFilespecs[@]}")
 }
 
@@ -191,28 +208,23 @@ filterGrep()
     # return a match in the newest file (and now support a catalog file).
     readarray -t filespecs < <(grep --no-messages --files-with-matches --directories=skip "$@" -- "${filespecs[@]}")
     matchers+="${matchers:+ and} where $whatPlural match $*"
+    nonMatchers+="${nonMatchers:+ or} where $whatPlural match $*"
+    ensureResults
 }
 
-recallByNumber()
+filterSelection()
 {
-    ${DEBUG:+dump-args --on-debug -a recallByNumber -- "$count" -- "${filespecs[@]}"}
+    ${DEBUG:+dump-args --on-debug -a filterSelection -- "${selections[@]}" -- "${filespecs[@]}"}
 
-    if [ -n "$count" ] && [ ${#filespecs[@]} -ge $count ]; then
-	# Take the N'th result.
-	printf %s "${filespecs[$((count - 1))]}"
-    elif [ -z "$count" ] && [ ${#filespecs[@]} -eq 1 ]; then
-	# Take a unique result.
-	printf %s "${filespecs[0]}"
-    elif [ ${#filespecs[@]} -gt 1 ]; then
-	printf >&2 'There are %s%d %s%s.\n' "${count:+only }" "${#filespecs[@]}" "$whatPlural" "$matchers"
-	return 1
-    elif [ ${#filespecs[@]} -eq 1 ]; then
-	printf >&2 'There is %s1 %s%s.\n' "${count:+only }" "$what" "$matchers"
-	return 1
-    elif [ ${#filespecs[@]} -eq 0 ]; then
-	printf >&2 'There are no %s%s.\n' "$whatPlural" "${matchers// and / or }"
-	return 1
-    fi
+    readarray -t filespecs < <(
+	printf '%s\n' "${filespecs[@]}" \
+	    | commandOnSelected --stdin \
+		--entry-name "${what}${matchers//,/，},${whatPlural}${matchers//,/，}" \
+		--no-entries-message "There are no ${whatPlural}${nonMatchers}." \
+		"${commandOnSelectedArgs[@]}" "${selections[@]}"
+    )
+
+    [ ${#filespecs[@]} -gt 0 ]
 }
 
 catalogFilespec=
@@ -220,8 +232,11 @@ subdir=
 glob='*'
 commands=
 typeset -a commandArgs=()
-count=
-haveMatcher=
+typeset -a commandOnSelectedArgs=()
+typeset -a selections=()
+typeset -a grepArgs=()
+haveCompleteGrep=
+didAttemptFilterByName=
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -254,9 +269,9 @@ do
 			;;
 
 	--regexp|-e|--file|-f)
-			grepArgs+=("$1" "${2?}"); shift; shift; haveMatcher=t;;
+			grepArgs+=("$1" "${2?}"); shift; shift; haveCompleteGrep=t;;
 	--@(regexp|file)=*)
-			grepArgs+=("$1");  shift; haveMatcher=t;;
+			grepArgs+=("$1");  shift; haveCompleteGrep=t;;
 	-@([EFGPivwxsaIrRUz]))
 			grepArgs+=("$1"); shift;;
 	--@(extended-regexp|fixed-strings|basic-regexp|perl-regexp|ignore-case|invert-match|word-regexp|line-regexp|no-messages|text|recursive|dereference-recursive|binary|null-data))
@@ -273,57 +288,64 @@ do
 			commands+="${commands:+ $FILERECALL_COMMAND_JOINER }${quotedSimpleCommand//"$escapedFileMarker"/$fileMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
 			break
 			;;
-	*)		getFiles
-			checkGlob="$glob"; [[ "$1" =~ / ]] && checkGlob='**'
-			if [ ${#grepArgs[@]} -gt 0 ] && [ ! "$haveMatcher" ]; then
+	-*)		if argCount=$(commandOnSelected --understand-for config --understands "$@"); then
+			    commandOnSelectedArgs+=("${@:1:argCount}")
+			    shift $argCount
+			    continue
+			elif [ $? -eq 2 ]; then
+			    exit 2
+			fi
+			;;&
+	*)		if [ ${#grepArgs[@]} -gt 0 ] && [ ! "$haveCompleteGrep" ]; then
 			    # We have GREP-ARGS, but no PATTERN yet; this is the PATTERN.
 			    grepArgs+=("$1")
-			    haveMatcher=t
-			elif [ "$haveMatcher" ]; then
-			    if [ -n "$commands" ]; then
-				commandArgs+=("$1")
-			    else
-				printf -v quotedSimpleCommand '%q ' "$@"
-				printf -v escapedFileMarker %q "$fileMarker"
-				commands="${quotedSimpleCommand//"$escapedFileMarker"/$fileMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
-				break
-			    fi
-			elif [ -z "$count" ] && [[ "$1" =~ ^[0-9]+$ ]]; then
-			    # Number means N'th recent file, but could also index into multiple NAME-GLOB
-			    # / grep results.
-			    count="$1"
+			    haveCompleteGrep=t
+			    shift
+			elif [ -z "$1" ]; then
+			    # Empty argument means matching done, following arguments are SIMPLECOMMAND or
+			    # COMMAND-ARGS.
+			    shift; break
+			elif argCount=$(commandOnSelected --understand-for selection --understands "$@"); then
+			    selections+=("${@:1:argCount}")
+			    shift $argCount
+			elif [ $? -eq 2 ]; then
+			    exit 2
+			elif [ ! "$didAttemptFilterByName" ] && didAttemptFilterByName=t \
+			    && getFiles && filterByName "$1"
+			then
+			    shift
+			elif [ ${#grepArgs[@]} -eq 0 ]; then
+			    grepArgs+=(-e "$1")
+			    haveCompleteGrep=t
+			    shift
 			else
-			    if [ -z "$1" ]; then
-				# Empty argument means first file, matcher done, following arguments are COMMAND-ARGS.
-				:
-			    elif [[ "$1" =~ ^[0-9]+$ ]]; then
-				printUsage >&2 "$0"
-				exit 2
-			    elif filterByName "$1"; then
-				:
-			    elif [ -n "$count" -a -n "$commands" ]; then
-				# With a COMMAND, "N PATTERN" is not supported and instead interpreted as
-				# "N COMMAND-ARG"; you need to use "N -e PATTERN ;" instead.
-				commandArgs+=("$1")
-			    else
-				# Take the newest / N'th matching file.
-				grepArgs+=(-e "$1")
-			    fi
-			    haveMatcher=t
+			    break
 			fi
-			shift
 			;;
     esac
 done
+if [ $# -gt 0 ]; then
+    case "$1" in
+	--)		shift
+			printf -v quotedSimpleCommand '%q ' "$@"
+			printf -v escapedFileMarker %q "$fileMarker"
+			commands+="${commands:+ $FILERECALL_COMMAND_JOINER }${quotedSimpleCommand//"$escapedFileMarker"/$fileMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
+			;;
+	*)		if [ -n "$commands" ]; then
+			    commandArgs+=("$@")
+			else
+			    printf -v quotedSimpleCommand '%q ' "$@"
+			    printf -v escapedFileMarker %q "$fileMarker"
+			    commands="${quotedSimpleCommand//"$escapedFileMarker"/$fileMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
+			fi
+			;;
+    esac
+fi
 
 getFiles
 [ ${#grepArgs[@]} -eq 0 ] \
-    || filterGrep "${grepArgs[@]}"
-if [ -z "$count" ] && [ ! "$haveMatcher" ]; then
-    filespec="$(count=1 recallByNumber)"
-else
-    filespec="$(recallByNumber)"
-fi || exit 4
+    || filterGrep "${grepArgs[@]}" || exit 4
+filterSelection || exit 4
 
 if [ -z "$commands" ]; then
     printf -v commands '%q %s' "${PAGER:-less}" --RAW-CONTROL-CHARS
@@ -333,9 +355,7 @@ if [ ${#commandArgs[@]} -gt 0 ]; then
     commands+="$quotedCommandArgs"
 fi
 
-interpolatedCommands="${commands//"$fileMarker"/$filespec}"
-typeset -a f=("$filespec")
-printf -v filespec '%q' "$filespec"
-interpolatedCommands="${commands//"$fileMarker"/$filespec}"
-[ "$interpolatedCommands" = "$commands" ] || f=()
-eval "$interpolatedCommands" '"${f[@]}"'
+printf -v quotedFiles '%q ' "${filespecs[@]}"; quotedFiles="${quotedFiles% }"
+interpolatedCommands="${commands//"$fileMarker"/$quotedFiles}"
+[ "$interpolatedCommands" = "$commands" ] || quotedFiles=''
+eval "$interpolatedCommands" "$quotedFiles"
