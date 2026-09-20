@@ -172,7 +172,7 @@ ensureResults()
 
 filterByName()
 {
-    ${DEBUG:+dump-args --on-debug -a filterByName -- "$@" -- "${filespecs[@]}"}
+    ${DEBUG:+eval $(debugtrace --point filterByName --var "$(declare -p filespecs)" -o $- -- "$@")}
 
     local potentialFilespec
     typeset -a matchedFilespecs=()
@@ -202,7 +202,7 @@ filterByName()
 
 filterGrep()
 {
-    ${DEBUG:+dump-args --on-debug -a filterGrep -- "$@" -- "${filespecs[@]}"}
+    ${DEBUG:+eval $(debugtrace --point filterGrep --var "$(declare -p filespecs)" -o $- -- "$@")}
 
     # Note: Cannot simply use $FILERECALL_BASEDIR/* glob here because we want to
     # return a match in the newest file (and now support a catalog file).
@@ -214,7 +214,7 @@ filterGrep()
 
 filterSelection()
 {
-    ${DEBUG:+dump-args --on-debug -a filterSelection -- "${selections[@]}" -- "${filespecs[@]}"}
+    ${DEBUG:+eval $(debugtrace --point filterSelection --var "$(declare -p selections filespecs)" -o $- --)}
 
     readarray -t filespecs < <(
 	printf '%s\n' "${filespecs[@]}" \
