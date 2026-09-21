@@ -226,12 +226,22 @@ filterSelection()
 {
     ${DEBUG:+eval $(debugtrace --point filterSelection --var "$(declare -p selections filespecs)" -o $- --)}
 
+    typeset -a commandOnSelectedCommand=(
+	commandOnSelected --stdin \
+	    --entry-name "${what}${matchers//,/，},${whatPlural}${matchers//,/，}" \
+	    --no-entries-message "There are no ${whatPlural}${nonMatchers}." \
+	    "${commandOnSelectedArgs[@]}" "${selections[@]}"
+    )
+
     readarray -t filespecs < <(
-	printf '%s\n' "${filespecs[@]}" \
-	    | commandOnSelected --stdin \
-		--entry-name "${what}${matchers//,/，},${whatPlural}${matchers//,/，}" \
-		--no-entries-message "There are no ${whatPlural}${nonMatchers}." \
-		"${commandOnSelectedArgs[@]}" "${selections[@]}"
+	if [ -n "$nameMappingFilespec" ]; then
+	    printf -v quotedCommandOnSelectedCommand '%q ' "${commandOnSelectedCommand[@]}"
+	    cat -- "$nameMappingFilespec" \
+		| commandWithHiddenId --stdin --piped --command "${quotedCommandOnSelectedCommand% }"
+	else
+	    printf '%s\n' "${filespecs[@]}" \
+		| "${commandOnSelectedCommand[@]}"
+	fi
     )
 
     [ ${#filespecs[@]} -gt 0 ]
