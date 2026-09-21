@@ -22,6 +22,7 @@ where="${FILERECALL_WHERE}${FILERECALL_WHERE:+ }"
 : ${FILERECALL_EXEC_END=;}
 : ${FILERECALL_FILE_MARKER='{}'}
 fileMarker="$FILERECALL_FILE_MARKER"; unset FILERECALL_FILE_MARKER
+: ${FILERECALL_MAPPING_SEPARATOR=$'\t'}
 
 getShortUsage()
 {
@@ -82,9 +83,10 @@ HELPTEXT
     --reverse		Reverse the order of the ${where}${whatPlural}.
     --name-mapping MAPPING-FILE
 			Use MAPPING-FILE to map the recalled ${where}${whatPlural} to
-			(not necessarily unique) titles on which selections are
-			made instead of the bare filespecs. MAPPING-FILE should
-			consist of lines of the format FILESPEC TAB TITLE.
+			(not necessarily unique) names on which NAME filtering
+			and selections are made instead of the bare filespecs.
+			MAPPING-FILE should consist of lines of the format
+			FILESPEC ${FILERECALL_MAPPING_SEPARATOR@Q} NAME.
 HELPTEXT
 		;;&
 	    ''|query)
@@ -111,7 +113,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "$(getShortUsage input) [-?|-h|--help] ..."
+    printf 'Usage: [FILERECALL_MAPPING_SEPARATOR=STRING] %q %s\n' "${FILERECALL:-$(basename "$1")}" "$(getShortUsage input) [-?|-h|--help] ..."
     echo
     printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... $(getShortUsage query1)"
     printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... $(getShortUsage query2)"
@@ -190,7 +192,7 @@ mapFilespecs()
 {
     local filespec; for filespec in "${filespecs[@]}"
     do
-	printf '%s\t%s\n' "$filespec" "${nameMapping["$filespec"]:-$filespec}"
+	printf '%s%s%s\n' "$filespec" "$FILERECALL_MAPPING_SEPARATOR" "${nameMapping["$filespec"]:-$filespec}"
     done
 }
 
@@ -301,12 +303,12 @@ do
 	--sort=*)	sortArg=("$1"); shift;;
 	--reverse)	shift; isReverse=t;;
 	--name-mapping)	shift
-			while IFS=$'\t' read -r filespec title
+			while IFS="$FILERECALL_MAPPING_SEPARATOR" read -r filespec title
 			do
 			    nameMapping["$filespec"]="$title"
 			done <"${1:?}"
 			shift
-			export COMMANDWITHHIDDENID_SEPARATOR_GLOB=$'\t'
+			export COMMANDWITHHIDDENID_SEPARATOR_GLOB="$FILERECALL_MAPPING_SEPARATOR"
 			;;
 
 	--command|-c)	shift; commands+="${commands:+ $FILERECALL_COMMAND_JOINER }$1"; shift;;
