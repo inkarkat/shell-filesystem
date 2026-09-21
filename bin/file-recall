@@ -185,16 +185,10 @@ filterByName()
 {
     ${DEBUG:+eval $(debugtrace --point filterByName --var "$(declare -p filespecs)" -o $- -- "$@")}
 
-    local potentialFilespec
+    local literalName="$(printf %s "${subdir}${subdir:+/}${1}" | sed -e 's/[][\$*.^]/\\&/g')"
     typeset -a matchedFilespecs=()
-    for potentialFilespec in "${filespecs[@]}"
-    do
-	if [[ "/$potentialFilespec" = *"/${subdir}${subdir:+/}${1}" ]]; then
-	    # Take the full given NAME.
-	    matchedFilespecs+=("$potentialFilespec")
-	fi
-    done
 
+    readarray -t matchedFilespecs < <(printf '%s\n' "${filespecs[@]}" | grep -e "\\(^\\|/\\)${literalName}\$")
     if [ ${#matchedFilespecs[@]} -gt 0 ]; then
 	matchers+="${matchers:+ and} where NAME is $1"
     elif type -t -- globmatch >/dev/null; then
