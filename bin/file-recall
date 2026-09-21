@@ -83,8 +83,8 @@ HELPTEXT
     --name-mapping MAPPING-FILE
 			Use MAPPING-FILE to map the recalled ${where}${whatPlural} to
 			(not necessarily unique) titles on which selections are
-			made instead of the bare filespecs. It is assumed that
-			a mapping for each input file exists in there.
+			made instead of the bare filespecs. MAPPING-FILE should
+			consist of lines of the format FILESPEC WHITESPACE TITLE.
 HELPTEXT
 		;;&
 	    ''|query)
@@ -188,7 +188,10 @@ ensureResults()
 
 mapFilespecs()
 {
-    cat -- "$nameMappingFilespec"
+    local filespec; for filespec in "${filespecs[@]}"
+    do
+	printf '%s\t%s\n' "$filespec" "${nameMapping["$filespec"]:-$filespec}"
+    done
 }
 
 filterByName()
@@ -199,7 +202,7 @@ filterByName()
     typeset -a matchedFilespecs=()
 
     typeset -a grepCommand=(grep -e "\\(^\\|/\\)${literalName}\$")
-    if [ -n "$nameMappingFilespec" ]; then
+    if [ ${#nameMapping[@]} -gt 0 ]; then
 	readarray -t matchedFilespecs < <(
 	    mapFilespecs \
 		| commandWithHiddenId --stdin --piped --exec "${grepCommand[@]}" \;
@@ -212,7 +215,7 @@ filterByName()
 	matchers+="${matchers:+ and} where NAME is $1"
     elif type -t -- globmatch >/dev/null; then
 	typeset -a globmatchCommand=(globmatch --exclude-directories ${subdir:+--subpath} --files-matching "${subdir}${subdir:+/}*${1}*")
-	if [ -n "$nameMappingFilespec" ]; then
+	if [ ${#nameMapping[@]} -gt 0 ]; then
 	    readarray -t matchedFilespecs < <(
 		mapFilespecs \
 		    | commandWithHiddenId --stdin --exec "${globmatchCommand[@]}" \;
@@ -256,7 +259,7 @@ filterSelection()
     )
 
     readarray -t filespecs < <(
-	if [ -n "$nameMappingFilespec" ]; then
+	if [ ${#nameMapping[@]} -gt 0 ]; then
 	    printf -v quotedCommandOnSelectedCommand '%q ' "${commandOnSelectedCommand[@]}"
 	    mapFilespecs \
 		| commandWithHiddenId --stdin --piped --command "${quotedCommandOnSelectedCommand% }"
@@ -271,7 +274,7 @@ filterSelection()
 
 typeset -a sortArg=(--sort=time)
 isReverse=
-nameMappingFilespec=
+typeset -A nameMapping=()
 catalogFilespec=
 subdir=
 glob='*'
@@ -297,7 +300,13 @@ do
 	--sort)		sortArg=("$1" "${2?}"); shift; shift;;
 	--sort=*)	sortArg=("$1"); shift;;
 	--reverse)	shift; isReverse=t;;
-	--name-mapping)	shift; nameMappingFilespec="${1:?}"; shift;;
+	--name-mapping)	shift
+			while read -r filespec title
+			do
+			    nameMapping["$filespec"]="$title"
+			done <"${1:?}"
+			shift
+			;;
 
 	--command|-c)	shift; commands+="${commands:+ $FILERECALL_COMMAND_JOINER }$1"; shift;;
 	--exec)		shift
