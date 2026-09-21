@@ -84,7 +84,7 @@ HELPTEXT
 			Use MAPPING-FILE to map the recalled ${where}${whatPlural} to
 			(not necessarily unique) titles on which selections are
 			made instead of the bare filespecs. MAPPING-FILE should
-			consist of lines of the format FILESPEC WHITESPACE TITLE.
+			consist of lines of the format FILESPEC TAB TITLE.
 HELPTEXT
 		;;&
 	    ''|query)
@@ -301,11 +301,12 @@ do
 	--sort=*)	sortArg=("$1"); shift;;
 	--reverse)	shift; isReverse=t;;
 	--name-mapping)	shift
-			while read -r filespec title
+			while IFS=$'\t' read -r filespec title
 			do
 			    nameMapping["$filespec"]="$title"
 			done <"${1:?}"
 			shift
+			export COMMANDWITHHIDDENID_SEPARATOR_GLOB=$'\t'
 			;;
 
 	--command|-c)	shift; commands+="${commands:+ $FILERECALL_COMMAND_JOINER }$1"; shift;;
