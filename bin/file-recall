@@ -22,6 +22,7 @@ where="${FILERECALL_WHERE}${FILERECALL_WHERE:+ }"
 : ${FILERECALL_EXEC_END=;}
 : ${FILERECALL_FILE_MARKER='{}'}
 fileMarker="$FILERECALL_FILE_MARKER"; unset FILERECALL_FILE_MARKER
+: ${FILERECALL_MAPPING_SEPARATOR=$'\t'}
 
 getShortUsage()
 {
@@ -37,7 +38,7 @@ getShortUsage()
 		[ "$FILERECALL_OFFER_SUBDIRS" ] \
 		    && printf %s "${usageSep}${hadTopic:+ }" '[-d|--directory SUBDIR] [-r|--recursive] [--sort=none|size|time|version|extension]' \
 		    || printf %s "${usageSep}${hadTopic:+ }" '[--catalog CATALOG-FILE]'
-		printf %s ' [--reverse]'
+		printf %s ' [--reverse] [--name-mapping MAPPING-FILE]'
 		hadTopic=t
 		;;&
 	    ''|query1)
@@ -80,6 +81,12 @@ HELPTEXT
 		fi
 		cat <<HELPTEXT
     --reverse		Reverse the order of the ${where}${whatPlural}.
+    --name-mapping MAPPING-FILE
+			Use MAPPING-FILE to map the recalled ${where}${whatPlural} to
+			(not necessarily unique) names on which NAME filtering
+			and selections are made instead of the bare filespecs.
+			MAPPING-FILE should consist of lines of the format
+			FILESPEC ${FILERECALL_MAPPING_SEPARATOR@Q} NAME.
 HELPTEXT
 		;;&
 	    ''|query)
@@ -106,7 +113,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "$(getShortUsage input) [-?|-h|--help] ..."
+    printf 'Usage: [FILERECALL_MAPPING_SEPARATOR=STRING] %q %s\n' "${FILERECALL:-$(basename "$1")}" "$(getShortUsage input) [-?|-h|--help] ..."
     echo
     printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... $(getShortUsage query1)"
     printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... $(getShortUsage query2)"
@@ -181,24 +188,43 @@ ensureResults()
     return 1
 }
 
+mapFilespecs()
+{
+    local filespec; for filespec in "${filespecs[@]}"
+    do
+	printf '%s%s%s\n' "$filespec" "$FILERECALL_MAPPING_SEPARATOR" "${nameMapping["$filespec"]:-$filespec}"
+    done
+}
+
 filterByName()
 {
     ${DEBUG:+eval $(debugtrace --point filterByName --var "$(declare -p filespecs)" -o $- -- "$@")}
 
-    local potentialFilespec
+    local literalName="$(printf %s "${subdir}${subdir:+/}${1}" | sed -e 's/[][\$*.^]/\\&/g')"
     typeset -a matchedFilespecs=()
-    for potentialFilespec in "${filespecs[@]}"
-    do
-	if [[ "/$potentialFilespec" = *"/${subdir}${subdir:+/}${1}" ]]; then
-	    # Take the full given NAME.
-	    matchedFilespecs+=("$potentialFilespec")
-	fi
-    done
+
+    typeset -a grepCommand=(grep -e "\\(^\\|/\\)${literalName}\$")
+    if [ ${#nameMapping[@]} -gt 0 ]; then
+	readarray -t matchedFilespecs < <(
+	    mapFilespecs \
+		| commandWithHiddenId --stdin --piped --exec "${grepCommand[@]}" \;
+	)
+    else
+	readarray -t matchedFilespecs < <(printf '%s\n' "${filespecs[@]}" | "${grepCommand[@]}")
+    fi
 
     if [ ${#matchedFilespecs[@]} -gt 0 ]; then
 	matchers+="${matchers:+ and} where NAME is $1"
     elif type -t -- globmatch >/dev/null; then
-	readarray -t matchedFilespecs < <(globmatch --exclude-directories --files-matching "*${1}*" "${filespecs[@]}")
+	typeset -a globmatchCommand=(globmatch --exclude-directories ${subdir:+--subpath} --files-matching "${subdir}${subdir:+/}*${1}*")
+	if [ ${#nameMapping[@]} -gt 0 ]; then
+	    readarray -t matchedFilespecs < <(
+		mapFilespecs \
+		    | commandWithHiddenId --stdin --exec "${globmatchCommand[@]}" \;
+	    )
+	else
+	    readarray -t matchedFilespecs < <("${globmatchCommand[@]}" "${filespecs[@]}")
+	fi
 	[ ${#matchedFilespecs[@]} -gt 0 ] \
 	    && matchers+="${matchers:+ and} where NAME matches \"$1\""
     fi
@@ -227,12 +253,22 @@ filterSelection()
 {
     ${DEBUG:+eval $(debugtrace --point filterSelection --var "$(declare -p selections filespecs)" -o $- --)}
 
+    typeset -a commandOnSelectedCommand=(
+	commandOnSelected --stdin \
+	    --entry-name "${what}${matchers//,/，},${whatPlural}${matchers//,/，}" \
+	    --no-entries-message "There are no ${whatPlural}${nonMatchers}." \
+	    "${commandOnSelectedArgs[@]}" "${selections[@]}"
+    )
+
     readarray -t filespecs < <(
-	printf '%s\n' "${filespecs[@]}" \
-	    | commandOnSelected --stdin \
-		--entry-name "${what}${matchers//,/，},${whatPlural}${matchers//,/，}" \
-		--no-entries-message "There are no ${whatPlural}${nonMatchers}." \
-		"${commandOnSelectedArgs[@]}" "${selections[@]}"
+	if [ ${#nameMapping[@]} -gt 0 ]; then
+	    printf -v quotedCommandOnSelectedCommand '%q ' "${commandOnSelectedCommand[@]}"
+	    mapFilespecs \
+		| commandWithHiddenId --stdin --piped --command "${quotedCommandOnSelectedCommand% }"
+	else
+	    printf '%s\n' "${filespecs[@]}" \
+		| "${commandOnSelectedCommand[@]}"
+	fi
     )
 
     [ ${#filespecs[@]} -gt 0 ]
@@ -240,6 +276,7 @@ filterSelection()
 
 typeset -a sortArg=(--sort=time)
 isReverse=
+typeset -A nameMapping=()
 catalogFilespec=
 subdir=
 glob='*'
@@ -265,6 +302,14 @@ do
 	--sort)		sortArg=("$1" "${2?}"); shift; shift;;
 	--sort=*)	sortArg=("$1"); shift;;
 	--reverse)	shift; isReverse=t;;
+	--name-mapping)	shift
+			while IFS="$FILERECALL_MAPPING_SEPARATOR" read -r filespec title
+			do
+			    nameMapping["$filespec"]="$title"
+			done <"${1:?}"
+			shift
+			export COMMANDWITHHIDDENID_SEPARATOR_GLOB="$FILERECALL_MAPPING_SEPARATOR"
+			;;
 
 	--command|-c)	shift; commands+="${commands:+ $FILERECALL_COMMAND_JOINER }$1"; shift;;
 	--exec)		shift
@@ -327,7 +372,7 @@ do
 			elif [ $? -eq 2 ]; then
 			    exit 2
 			elif [ ! "$didAttemptFilterByName" ] && didAttemptFilterByName=t \
-			    && getFiles && filterByName "$1"
+			    && getFiles && filterByName "${1:?}"
 			then
 			    shift
 			elif [ ${#grepArgs[@]} -eq 0 ]; then
