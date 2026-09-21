@@ -49,6 +49,8 @@ getShortUsage()
 		printf %s "${usageSep}${hadTopic:+ }" "${query} SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"; hadTopic=t;;&
 	    ''|query4)
 		printf %s "${usageSep}${hadTopic:+ }" "[-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${FILERECALL_EXEC_END} [--exec ...]] [${query}] -- SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]}"; hadTopic=t;;&
+	    ''|config)
+		printf %s "${usageSep}${hadTopic:+ }"; commandOnSelected --get-short-usage config 2>/dev/null; hadTopic=t;;&
 	    *)  [ "$hadTopic" ] || { echo "ERROR: Unknown short usage topic \"$1\"!" >&2; return 2; };;
 	esac
 	shift; usageSep=' '
@@ -89,6 +91,10 @@ HELPTEXT
 			FILESPEC ${FILERECALL_MAPPING_SEPARATOR@Q} NAME.
 HELPTEXT
 		;;&
+	    ''|config)
+		commandOnSelected --get-long-usage config 2>/dev/null
+		hadTopic=t
+		;;&
 	    ''|query)
 		cat <<HELPTEXT
     GREP-ARGS [...]	Recall the newest ${where}${what} whose contents
@@ -113,7 +119,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [FILERECALL_MAPPING_SEPARATOR=STRING] %q %s\n' "${FILERECALL:-$(basename "$1")}" "$(getShortUsage input) [-?|-h|--help] ..."
+    printf 'Usage: [FILERECALL_MAPPING_SEPARATOR=STRING] %q %s\n' "${FILERECALL:-$(basename "$1")}" "$(getShortUsage input config) [-?|-h|--help] ..."
     echo
     printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... $(getShortUsage query1)"
     printf 'Usage: %q %s\n' "${FILERECALL:-$(basename "$1")}" "... $(getShortUsage query2)"
