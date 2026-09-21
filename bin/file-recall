@@ -37,6 +37,7 @@ getShortUsage()
 		[ "$FILERECALL_OFFER_SUBDIRS" ] \
 		    && printf %s "${usageSep}${hadTopic:+ }" '[-d|--directory SUBDIR] [-r|--recursive] [--sort=none|size|time|version|extension]' \
 		    || printf %s "${usageSep}${hadTopic:+ }" '[--catalog CATALOG-FILE]'
+		printf %s ' [--reverse]'
 		hadTopic=t
 		;;&
 	    ''|query1)
@@ -77,6 +78,9 @@ HELPTEXT
 			(one filespec per line) instead of the current location.
 HELPTEXT
 		fi
+		cat <<HELPTEXT
+    --reverse		Reverse the order of the ${where}${whatPlural}.
+HELPTEXT
 		;;&
 	    ''|query)
 		cat <<HELPTEXT
@@ -145,14 +149,18 @@ typeset -a filespecs=()
 getFiles()
 {
     if [ -n "$catalogFilespec" ]; then
-	readarray -t filespecs <"$catalogFilespec"
+	if [ "$isReverse" ]; then
+	    readarray -t filespecs < <(tac -- "$catalogFilespec")
+	else
+	    readarray -t filespecs <"$catalogFilespec"
+	fi
     else
 	local searchDirspec="${FILERECALL_BASEDIR}${subdir:+/$subdir}"
 
 	while IFS=$'\n' read -r filespec
 	do
 	    [ -d "$filespec" ] || filespecs+=("$filespec")
-	done < <(eval "ls --directory \"\${sortArg[@]}\" \"\${searchDirspec}\"/${glob}")
+	done < <(eval "ls --directory \"\${sortArg[@]}\" ${isReverse:+--reverse} \"\${searchDirspec}\"/${glob}")
     fi
 
     if [ ${#filespecs[@]} -eq 0 ]; then
@@ -231,6 +239,7 @@ filterSelection()
 }
 
 typeset -a sortArg=(--sort=time)
+isReverse=
 catalogFilespec=
 subdir=
 glob='*'
@@ -255,6 +264,7 @@ do
 	--catalog)	shift; catalogFilespec="${1:?}"; shift; FILERECALL_OFFER_SUBDIRS='';;
 	--sort)		sortArg=("$1" "${2?}"); shift; shift;;
 	--sort=*)	sortArg=("$1"); shift;;
+	--reverse)	shift; isReverse=t;;
 
 	--command|-c)	shift; commands+="${commands:+ $FILERECALL_COMMAND_JOINER }$1"; shift;;
 	--exec)		shift
