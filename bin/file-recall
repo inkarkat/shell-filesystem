@@ -37,7 +37,7 @@ getShortUsage()
 		[ "$FILERECALL_OFFER_SUBDIRS" ] \
 		    && printf %s "${usageSep}${hadTopic:+ }" '[-d|--directory SUBDIR] [-r|--recursive] [--sort=none|size|time|version|extension]' \
 		    || printf %s "${usageSep}${hadTopic:+ }" '[--catalog CATALOG-FILE]'
-		printf %s ' [--reverse]'
+		printf %s ' [--reverse] [--name-mapping MAPPING-FILE]'
 		hadTopic=t
 		;;&
 	    ''|query1)
@@ -80,6 +80,11 @@ HELPTEXT
 		fi
 		cat <<HELPTEXT
     --reverse		Reverse the order of the ${where}${whatPlural}.
+    --name-mapping MAPPING-FILE
+			Use MAPPING-FILE to map the recalled ${where}${whatPlural} to
+			(not necessarily unique) titles on which selections are
+			made instead of the bare filespecs. It is assumed that
+			a mapping for each input file exists in there.
 HELPTEXT
 		;;&
 	    ''|query)
@@ -234,6 +239,7 @@ filterSelection()
 
 typeset -a sortArg=(--sort=time)
 isReverse=
+nameMappingFilespec=
 catalogFilespec=
 subdir=
 glob='*'
@@ -259,6 +265,7 @@ do
 	--sort)		sortArg=("$1" "${2?}"); shift; shift;;
 	--sort=*)	sortArg=("$1"); shift;;
 	--reverse)	shift; isReverse=t;;
+	--name-mapping)	shift; nameMappingFilespec="${1:?}"; shift;;
 
 	--command|-c)	shift; commands+="${commands:+ $FILERECALL_COMMAND_JOINER }$1"; shift;;
 	--exec)		shift
