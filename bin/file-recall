@@ -198,7 +198,7 @@ filterByName()
     if [ ${#matchedFilespecs[@]} -gt 0 ]; then
 	matchers+="${matchers:+ and} where NAME is $1"
     elif type -t -- globmatch >/dev/null; then
-	readarray -t matchedFilespecs < <(globmatch --exclude-directories --files-matching "*${1}*" "${filespecs[@]}")
+	readarray -t matchedFilespecs < <(globmatch --exclude-directories ${subdir:+--subpath} --files-matching "${subdir}${subdir:+/}*${1}*" "${filespecs[@]}")
 	[ ${#matchedFilespecs[@]} -gt 0 ] \
 	    && matchers+="${matchers:+ and} where NAME matches \"$1\""
     fi
@@ -327,7 +327,7 @@ do
 			elif [ $? -eq 2 ]; then
 			    exit 2
 			elif [ ! "$didAttemptFilterByName" ] && didAttemptFilterByName=t \
-			    && getFiles && filterByName "$1"
+			    && getFiles && filterByName "${1:?}"
 			then
 			    shift
 			elif [ ${#grepArgs[@]} -eq 0 ]; then
