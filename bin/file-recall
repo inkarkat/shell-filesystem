@@ -186,6 +186,11 @@ ensureResults()
     return 1
 }
 
+mapFilespecs()
+{
+    cat -- "$nameMappingFilespec"
+}
+
 filterByName()
 {
     ${DEBUG:+eval $(debugtrace --point filterByName --var "$(declare -p filespecs)" -o $- -- "$@")}
@@ -196,7 +201,7 @@ filterByName()
     typeset -a grepCommand=(grep -e "\\(^\\|/\\)${literalName}\$")
     if [ -n "$nameMappingFilespec" ]; then
 	readarray -t matchedFilespecs < <(
-	    cat -- "$nameMappingFilespec" \
+	    mapFilespecs \
 		| commandWithHiddenId --stdin --piped --exec "${grepCommand[@]}" \;
 	)
     else
@@ -209,7 +214,7 @@ filterByName()
 	typeset -a globmatchCommand=(globmatch --exclude-directories ${subdir:+--subpath} --files-matching "${subdir}${subdir:+/}*${1}*")
 	if [ -n "$nameMappingFilespec" ]; then
 	    readarray -t matchedFilespecs < <(
-		cat -- "$nameMappingFilespec" \
+		mapFilespecs \
 		    | commandWithHiddenId --stdin --exec "${globmatchCommand[@]}" \;
 	    )
 	else
@@ -253,7 +258,7 @@ filterSelection()
     readarray -t filespecs < <(
 	if [ -n "$nameMappingFilespec" ]; then
 	    printf -v quotedCommandOnSelectedCommand '%q ' "${commandOnSelectedCommand[@]}"
-	    cat -- "$nameMappingFilespec" \
+	    mapFilespecs \
 		| commandWithHiddenId --stdin --piped --command "${quotedCommandOnSelectedCommand% }"
 	else
 	    printf '%s\n' "${filespecs[@]}" \
