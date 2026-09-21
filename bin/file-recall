@@ -193,11 +193,28 @@ filterByName()
     local literalName="$(printf %s "${subdir}${subdir:+/}${1}" | sed -e 's/[][\$*.^]/\\&/g')"
     typeset -a matchedFilespecs=()
 
-    readarray -t matchedFilespecs < <(printf '%s\n' "${filespecs[@]}" | grep -e "\\(^\\|/\\)${literalName}\$")
+    typeset -a grepCommand=(grep -e "\\(^\\|/\\)${literalName}\$")
+    if [ -n "$nameMappingFilespec" ]; then
+	readarray -t matchedFilespecs < <(
+	    cat -- "$nameMappingFilespec" \
+		| commandWithHiddenId --stdin --piped --exec "${grepCommand[@]}" \;
+	)
+    else
+	readarray -t matchedFilespecs < <(printf '%s\n' "${filespecs[@]}" | "${grepCommand[@]}")
+    fi
+
     if [ ${#matchedFilespecs[@]} -gt 0 ]; then
 	matchers+="${matchers:+ and} where NAME is $1"
     elif type -t -- globmatch >/dev/null; then
-	readarray -t matchedFilespecs < <(globmatch --exclude-directories ${subdir:+--subpath} --files-matching "${subdir}${subdir:+/}*${1}*" "${filespecs[@]}")
+	typeset -a globmatchCommand=(globmatch --exclude-directories ${subdir:+--subpath} --files-matching "${subdir}${subdir:+/}*${1}*")
+	if [ -n "$nameMappingFilespec" ]; then
+	    readarray -t matchedFilespecs < <(
+		cat -- "$nameMappingFilespec" \
+		    | commandWithHiddenId --stdin --exec "${globmatchCommand[@]}" \;
+	    )
+	else
+	    readarray -t matchedFilespecs < <("${globmatchCommand[@]}" "${filespecs[@]}")
+	fi
 	[ ${#matchedFilespecs[@]} -gt 0 ] \
 	    && matchers+="${matchers:+ and} where NAME matches \"$1\""
     fi
