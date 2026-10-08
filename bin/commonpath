@@ -1,22 +1,49 @@
 #!/bin/bash
 # Source: https://github.com/l0b0/tilde/blob/master/.bash_aliases#L64
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: [COMMONPATH_REPLACEMENT=TEXT] %q %s\n' "$(basename "$1")" '[-f|--canonicalize] [-s|--strip] [--] FILESPEC [...] [-?|-h|--help]'
+}
 printUsage()
 {
-    cat <<HELPTEXT
-Print the directory that is common to all passed FILESPECs.
-Fails if there's no common path (i.e. only / is common).
-HELPTEXT
-    echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--canonicalize] [--] FILESPEC [...] [-?|-h|--help]'
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
 }
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Print the directory that is common to all passed FILESPECs.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --strip|-s		Strip the common path from all FILESPECs and print
+			\$COMMONPATH_REPLACEMENT${COMMONPATH_REPLACEMENT+ (${COMMONPATH_REPLACEMENT})} and what's remaining
+			of each FILESPEC.
+EXIT STATUS:
+    0	Complete success.
+    1	If there's no common path (i.e. only / is common).
+    2	Bad invocation, wrong or missing command-line arguments.
+HELPTEXT
+}
+
+action=printCommonPath
 isCanonicalize=
 while [ $# -ne 0 ]
 do
     case "$1" in
-	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--canonicalize|-f)
 			shift; isCanonicalize=t;;
+	--strip|-s)	shift; action=stripCommonPath;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -26,15 +53,35 @@ if [ $# -eq 0 ]; then
     printUsage >&2 "$0"
     exit 2
 fi
+
+printCommonPath()
+{
+    [ -n "$commonPath" ] || return 1
+    printf '%s\n' "$commonPath"
+}
+
+stripCommonPath()
+{
+    if [ -z "$commonPath" ]; then
+	printf '%s\n' "$@"
+	return 1
+    fi
+
+    for filespec
+    do
+	printf '%s%s\n' "${COMMONPATH_REPLACEMENT}${COMMONPATH_REPLACEMENT+/}" "${filespec#${commonPath}/}"
+    done
+}
+
 if [ "$isCanonicalize" ]; then
     readarray -t filespecs < <(readlink --canonicalize -- "$@")
     set -- "${filespecs[@]}"
 else
     # Remove repeated slashes.
-    for param
+    for filespec
     do
-	param="$(printf %s. "$1" | tr -s /)"
-	set -- "$@" "${param%.}"
+	filespec="$(printf %s. "$1" | tr -s /)"
+	set -- "$@" "${filespec%.}"
 	shift
     done
 fi
@@ -44,16 +91,20 @@ if [ $# -eq 1 ]; then
     exit
 fi
 
-common_path="$1"
-shift
-
-for param
+unset commonPath
+for filespec
 do
-    while case "${param%/}/" in "${common_path%/}/"*) false;; esac; do
-	new_common_path="${common_path%/*}"
-	[ "$new_common_path" = "$common_path" ] && exit 1 # Dead end
-	common_path="$new_common_path"
+    : ${commonPath=${1%/}}
+
+    while [[ "${filespec%/}/" != "${commonPath%/}/"* ]]; do
+	newCommonPath="${commonPath%/*}"
+	if [ "$newCommonPath" = "$commonPath" ];then
+	    # Dead end
+	    commonPath=''
+	    break
+	fi
+	commonPath="$newCommonPath"
     done
 done
-[ -z "$common_path" ] && exit 1
-printf '%s\n' "$common_path"
+
+$action "$@"
