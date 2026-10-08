@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--canonicalize] [--] FILESPEC [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--canonicalize] [-s|--strip] [--] FILESPEC [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -25,6 +25,8 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
+    --strip|-s		Strip the common path from all FILESPECs and print
+			what's remaining of each FILESPEC.
 EXIT STATUS:
     0	Complete success.
     1	If there's no common path (i.e. only / is common).
@@ -40,6 +42,7 @@ do
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--canonicalize|-f)
 			shift; isCanonicalize=t;;
+	--strip|-s)	shift; action=stripCommonPath;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -54,6 +57,19 @@ printCommonPath()
 {
     [ -n "$commonPath" ] || return 1
     printf '%s\n' "$commonPath"
+}
+
+stripCommonPath()
+{
+    if [ -z "$commonPath" ]; then
+	printf '%s\n' "$@"
+	return 1
+    fi
+
+    for filespec
+    do
+	printf '%s\n' "${filespec#${commonPath}/}"
+    done
 }
 
 if [ "$isCanonicalize" ]; then
