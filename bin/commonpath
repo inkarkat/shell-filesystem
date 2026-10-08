@@ -32,6 +32,7 @@ EXIT STATUS:
 HELPTEXT
 }
 
+action=printCommonPath
 isCanonicalize=
 while [ $# -ne 0 ]
 do
@@ -48,6 +49,13 @@ if [ $# -eq 0 ]; then
     printUsage >&2 "$0"
     exit 2
 fi
+
+printCommonPath()
+{
+    [ -n "$commonPath" ] || return 1
+    printf '%s\n' "$commonPath"
+}
+
 if [ "$isCanonicalize" ]; then
     readarray -t filespecs < <(readlink --canonicalize -- "$@")
     set -- "${filespecs[@]}"
@@ -77,5 +85,5 @@ do
 	commonPath="$newCommonPath"
     done
 done
-[ -z "$commonPath" ] && exit 1
-printf '%s\n' "$commonPath"
+
+$action "$@"
