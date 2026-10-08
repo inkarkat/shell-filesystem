@@ -49,7 +49,7 @@ shift
 
 for filespec
 do
-    while case "${filespec%/}/" in "${commonPath%/}/"*) false;; esac; do
+    while [[ "${filespec%/}/" != "${commonPath%/}/"* ]]; do
 	newCommonPath="${commonPath%/*}"
 	[ "$newCommonPath" = "$commonPath" ] && exit 1 # Dead end
 	commonPath="$newCommonPath"
