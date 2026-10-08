@@ -74,14 +74,18 @@ if [ $# -eq 1 ]; then
     exit
 fi
 
-commonPath="$1"
-shift
-
+unset commonPath
 for filespec
 do
+    : ${commonPath=${1%/}}
+
     while [[ "${filespec%/}/" != "${commonPath%/}/"* ]]; do
 	newCommonPath="${commonPath%/*}"
-	[ "$newCommonPath" = "$commonPath" ] && exit 1 # Dead end
+	if [ "$newCommonPath" = "$commonPath" ];then
+	    # Dead end
+	    commonPath=''
+	    break
+	fi
 	commonPath="$newCommonPath"
     done
 done
