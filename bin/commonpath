@@ -31,10 +31,10 @@ if [ "$isCanonicalize" ]; then
     set -- "${filespecs[@]}"
 else
     # Remove repeated slashes.
-    for param
+    for filespec
     do
-	param="$(printf %s. "$1" | tr -s /)"
-	set -- "$@" "${param%.}"
+	filespec="$(printf %s. "$1" | tr -s /)"
+	set -- "$@" "${filespec%.}"
 	shift
     done
 fi
@@ -44,16 +44,16 @@ if [ $# -eq 1 ]; then
     exit
 fi
 
-common_path="$1"
+commonPath="$1"
 shift
 
-for param
+for filespec
 do
-    while case "${param%/}/" in "${common_path%/}/"*) false;; esac; do
-	new_common_path="${common_path%/*}"
-	[ "$new_common_path" = "$common_path" ] && exit 1 # Dead end
-	common_path="$new_common_path"
+    while case "${filespec%/}/" in "${commonPath%/}/"*) false;; esac; do
+	newCommonPath="${commonPath%/*}"
+	[ "$newCommonPath" = "$commonPath" ] && exit 1 # Dead end
+	commonPath="$newCommonPath"
     done
 done
-[ -z "$common_path" ] && exit 1
-printf '%s\n' "$common_path"
+[ -z "$commonPath" ] && exit 1
+printf '%s\n' "$commonPath"
