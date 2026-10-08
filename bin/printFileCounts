@@ -60,6 +60,7 @@ if [ $# -eq 0 ]; then
 fi
 [ ${#dates[@]} -eq 0 ] && isAll=t
 
+typeset -A namesToDirs=()
 typeset -A dirToName=()
 typeset -A resultsByDir=()
 for dir
@@ -84,9 +85,10 @@ do
 	    let count+=$c
 	done
 
+	name="$(basename -- "$dir")"
+	dirToName["$dir"]="$name"
+	namesToDirs["$name"]+=${namesToDirs["$name"]:+$'\n'}"$dir"
 	if [ $count -gt 0 ]; then
-	    name="$(basename -- "$dir")"
-	    dirToName["$dir"]="$name"
 	    preposition='in'; contains "$name" "${dirsAsVerbs[@]}" && preposition='to'
 
 	    if [ ${#dateCounts[@]} -eq 0 ]; then
@@ -104,8 +106,17 @@ done
 typeset -a results=()
 for dir
 do
-    [ -z "${resultsByDir["$dir"]}" ] \
-	|| results+=("${resultsByDir["$dir"]} ${dirToName["$dir"]}")
+    [ -n "${resultsByDir["$dir"]}" ] || continue
+
+    name="${dirToName["$dir"]}"
+    [[ ! "${namesToDirs["$name"]}" =~ $'\n' ]] \
+	|| name="$(
+	    printf '%s\n' "${namesToDirs["$name"]}" \
+		| mapSelectedLines --select-line "$dir" \
+		    linesToArgs \
+			commonpath --canonicalize --strip
+	    )"
+    results+=("${resultsByDir["$dir"]} $name")
 done
 
 [ ${#results[@]} -eq 0 ] && exit 0
