@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-f|--canonicalize] [-s|--strip] [--] FILESPEC [...] [-?|-h|--help]'
+    printf 'Usage: [COMMONPATH_REPLACEMENT=TEXT] %q %s\n' "$(basename "$1")" '[-f|--canonicalize] [-s|--strip] [--] FILESPEC [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -26,7 +26,8 @@ HELPDESCRIPTION
     echo
     cat <<HELPTEXT
     --strip|-s		Strip the common path from all FILESPECs and print
-			what's remaining of each FILESPEC.
+			\$COMMONPATH_REPLACEMENT${COMMONPATH_REPLACEMENT+ (${COMMONPATH_REPLACEMENT})} and what's remaining
+			of each FILESPEC.
 EXIT STATUS:
     0	Complete success.
     1	If there's no common path (i.e. only / is common).
@@ -68,7 +69,7 @@ stripCommonPath()
 
     for filespec
     do
-	printf '%s\n' "${filespec#${commonPath}/}"
+	printf '%s%s\n' "${COMMONPATH_REPLACEMENT}${COMMONPATH_REPLACEMENT+/}" "${filespec#${commonPath}/}"
     done
 }
 
