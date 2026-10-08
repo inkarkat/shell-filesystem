@@ -60,7 +60,8 @@ if [ $# -eq 0 ]; then
 fi
 [ ${#dates[@]} -eq 0 ] && isAll=t
 
-typeset -a results=()
+typeset -A dirToName=()
+typeset -A resultsByDir=()
 for dir
 do
     files=("$dir"/*)
@@ -85,18 +86,26 @@ do
 
 	if [ $count -gt 0 ]; then
 	    name="$(basename -- "$dir")"
+	    dirToName["$dir"]="$name"
 	    preposition='in'; contains "$name" "${dirsAsVerbs[@]}" && preposition='to'
 
 	    if [ ${#dateCounts[@]} -eq 0 ]; then
-		printf -v r '%d %s %s' "$fileCount" "$preposition" "$name"
+		printf -v r '%d %s' "$fileCount" "$preposition"
 	    elif [ -n "$isAll" -a $count -gt $fileCount ]; then
-		printf -v r '%d (%s) %s %s' "$fileCount" "$(joinBy ', ' "${dateCounts[@]}")" "$preposition" "$name"
+		printf -v r '%d (%s) %s' "$fileCount" "$(joinBy ', ' "${dateCounts[@]}")" "$preposition"
 	    else
-		printf -v r '%s %s %s' "$(joinBy ', ' "${dateCounts[@]}")" "$preposition" "$name"
+		printf -v r '%s %s' "$(joinBy ', ' "${dateCounts[@]}")" "$preposition"
 	    fi
-	    results+=("$r")
+	    resultsByDir["$dir"]="$r"
 	fi
     fi
+done
+
+typeset -a results=()
+for dir
+do
+    [ -z "${resultsByDir["$dir"]}" ] \
+	|| results+=("${resultsByDir["$dir"]} ${dirToName["$dir"]}")
 done
 
 [ ${#results[@]} -eq 0 ] && exit 0
