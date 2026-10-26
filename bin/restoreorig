@@ -54,6 +54,7 @@ HELPTEXT
 isKeepExtension=
 destinationDir=
 action='Restored'
+severity='ERROR'
 restoreCommand=cp
 defaultPostCommand=checkRestore
 typeset -a restoreCommandArgs=(--interactive)
@@ -79,7 +80,7 @@ do
 			restoreCommandArgs=("$1"); shift;;
 	--dry-run|-N)	shift; restoreCommand=:; action='Would restore';;
 	--only-delete-backup)
-			shift; restoreCommand=removeBackup; restoreCommandArgs=(); action='Deleted backup of'; defaultPostCommand='';;
+			shift; restoreCommand=removeBackup; restoreCommandArgs=(); action='Deleted backup of'; severity='Note'; defaultPostCommand='';;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -156,10 +157,10 @@ restorebackup()
 
 
     if [ ! -e "$backupFilespec" ]; then
-	printf >&2 'ERROR: "%s" does not exist!\n' "$backupFilespec"
+	printf >&2 '%s: "%s" does not exist.\n' "$severity" "$backupFilespec"
 	return 1
     elif [ ! -r "$backupFilespec" ]; then
-	printf >&2 'ERROR: "%s" is not readable!\n' "$backupFilespec"
+	printf >&2 '%s: "%s" is not readable.\n' "$severity" "$backupFilespec"
 	return 1
     fi
 
