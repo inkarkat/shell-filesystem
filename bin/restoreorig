@@ -45,12 +45,14 @@ EXIT STATUS:
     2   Bad invocation, wrong or missing command-line arguments
     3	Internal error or failed assertion.
     6	Partial success; some FILE(s) could not be restored.
+    99	No FILE(s) were restored.
 HELPTEXT
 }
 
 isKeepExtension=
 destinationDir=
 restoreCommand=cp
+defaultPostCommand=checkRestore
 typeset -a cpMvArgs=(--interactive)
 while [ $# -ne 0 ]
 do
@@ -69,7 +71,8 @@ do
 			;;
 	--delete-backup)
 			shift; restoreCommand=mv;;
-	--force|-f|--interactive|-i|--no-clobber|-n)
+	--force|-f)	defaultPostCommand='';;&
+	--interactive|-i|--no-clobber|-n)
 			cpMvArgs=("$1"); shift;;
 	--dry-run|-N)	shift; restoreCommand=:;;
 	--)		shift; break;;
@@ -90,8 +93,27 @@ printRestoreFile()
 
 removeBackup()
 {
+    ${defaultPostCommand:-:} "$@" || return $?
+
     local backupFilespec="${1:?}"; shift
     rm --recursive --force -- "$backupFilespec"
+}
+
+checkRestore()
+{
+    local backupFilespec="${1:?}"; shift
+    local targetFilespec="${1:?}"; shift
+    if [ -d "$backupFilespec" ]; then
+	local fileSubpath; while IFS=$'\n' read -r fileSubpath
+	do
+	    cmp --quiet "${backupFilespec}/${fileSubpath}" "${targetFilespec}/${fileSubpath}" \
+		&& return 0
+	done < <(cd "$backupFilespec" && find . -type f -printf '%P\n')
+	return 99
+    else
+	cmp --quiet -- "$backupFilespec" "$targetFilespec" >/dev/null 2>&1 \
+	    || return 99
+    fi
 }
 
 lastTargetFilespec=
@@ -143,7 +165,7 @@ restorebackup()
 
     local action='Restored'; [ "$restoreCommand" = : ] && action='Would restore'
     local what=''
-    local postCommand=''
+    local postCommand=$defaultPostCommand
     typeset -a cpMvDirArgs=()
     if [ -d "$backupFilespec" ]; then
 	what='directory'
@@ -162,7 +184,7 @@ restorebackup()
     fi
     $restoreCommand "${cpMvArgs[@]}" "${cpMvDirArgs[@]}" -- "$backupFilespec" "$rebasedFilespec" \
 	&& ${postCommand:-:} "$backupFilespec" "$rebasedFilespec" \
-	|| return 1
+	|| return $?
     printRestoreFile "${action}${what:+ }${what}" "$rebasedFilespec"
     return 0
 }
@@ -170,12 +192,20 @@ restorebackup()
 
 isSuccess=
 isFailure=
-
 for filespec
 do
-    restorebackup "$filespec" && isSuccess=t || isFailure=t
+    restorebackup "$filespec"
+    case $? in
+	0)  isSuccess=t;;
+	99) ;;
+	*)  isFailure=t;;
+    esac
 done
 
 if [ "$isFailure" ]; then
     [ "$isSuccess" ] && exit 6 || exit 1
+elif [ "$isSuccess" ]; then
+    exit 0
+else
+    exit 99
 fi
