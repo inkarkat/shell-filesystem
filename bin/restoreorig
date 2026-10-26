@@ -1,0 +1,211 @@
+#!/bin/bash
+
+: ${WRITEORIG_EXT:=orig}
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, they can
+    # skim the long one.
+    printf 'Usage: [WRITEORIG_EXT=orig] %q %s\n' "$(basename "$1")" "[-f|--force|-i|--interactive|-n|--no-clobber|-N|--dry-run] [-x|--keep-extension] [-d|--destination DIR] [--delete-backup] [--] FILE[.${WRITEORIG_EXT}]|DIR[.${WRITEORIG_EXT}] [...] [-?|-h|--help]"
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Restore a single backup of FILE / DIR found at FILE.${WRITEORIG_EXT} / DIR.${WRITEORIG_EXT}
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --force|-f		Do not prompt before overwriting an existing FILE. By
+			default, it will prompt for confirmation.
+    --interactive|-i	Prompt before overwriting. (This is the default.)
+    --no-clobber|-n	Do not overwrite an existing FILE.
+    --dry-run|-N	Show what would be done, but do not actually restore
+			anything.
+    --keep-extension|-x	Accept .${WRITEORIG_EXT} before the file extension of FILE,
+			i.e. FILE.${WRITEORIG_EXT}.ext instead of FILE.ext.${WRITEORIG_EXT}
+    --destination|-d DIR
+			Restore to DIR instead of in the same directory as the
+			backup FILE.${WRITEORIG_EXT}
+    --delete-backup	Removes the FILE.${WRITEORIG_EXT} backup after restoring FILE.
+
+EXIT STATUS:
+    0	Complete success.
+    1	Failed to restore any FILE(s).
+    2   Bad invocation, wrong or missing command-line arguments
+    3	Internal error or failed assertion.
+    6	Partial success; some FILE(s) could not be restored.
+    99	No FILE(s) were restored.
+HELPTEXT
+}
+
+isKeepExtension=
+destinationDir=
+restoreCommand=cp
+defaultPostCommand=checkRestore
+typeset -a cpMvArgs=(--interactive)
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--keep-extension|-x)
+			shift; isKeepExtension=t;;
+	--destination|-d)
+			if [ -z "$2" ]; then
+			    echo "ERROR: Must pass directory after ${1}!"; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			shift
+			destinationDir="${1%/}/"
+			shift
+			;;
+	--delete-backup)
+			shift; restoreCommand=mv;;
+	--force|-f)	defaultPostCommand='';;&
+	--interactive|-i|--no-clobber|-n)
+			cpMvArgs=("$1"); shift;;
+	--dry-run|-N)	shift; restoreCommand=:;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+
+printRestoreFile()
+{
+    local message="${1?}"; shift
+    local filespec="${1:?}"; shift
+    # When output is not to the terminal, just print the complete filespec. Other
+    # applications may use command substitution to obtain it.
+    [ -t 1 ] || message=''
+    printf '%s%s\n' "${message}${message:+ }" "$filespec"
+}
+
+removeBackup()
+{
+    ${defaultPostCommand:-:} "$@" || return $?
+
+    local backupFilespec="${1:?}"; shift
+    rm --recursive --force -- "$backupFilespec"
+}
+
+checkRestore()
+{
+    local backupFilespec="${1:?}"; shift
+    local targetFilespec="${1:?}"; shift
+    if [ -d "$backupFilespec" ]; then
+	local fileSubpath; while IFS=$'\n' read -r fileSubpath
+	do
+	    cmp --quiet "${backupFilespec}/${fileSubpath}" "${targetFilespec}/${fileSubpath}" \
+		&& return 0
+	done < <(cd "$backupFilespec" && find . -type f -printf '%P\n')
+	return 99
+    else
+	cmp --quiet -- "$backupFilespec" "$targetFilespec" >/dev/null 2>&1 \
+	    || return 99
+    fi
+}
+
+lastTargetFilespec=
+restorebackup()
+{
+    local -r filespec="${1%/}"
+
+    if [[ "$filespec" = *."$WRITEORIG_EXT" ]]; then
+	local -r backupFilespec="$filespec"
+	local -r targetFilespec="${filespec%.$WRITEORIG_EXT}"
+    elif [ "$isKeepExtension" ] && [[ "$filespec" = *."$WRITEORIG_EXT".* ]]; then
+	local -r backupFilespec="$filespec"
+	local -r filespecWithoutBackupExtensionAndExtension="${filespec%."$WRITEORIG_EXT".*}"
+	local -r extension="${filespec##*."$WRITEORIG_EXT"}"
+	local targetFilespec="${filespecWithoutBackupExtensionAndExtension}${extension}"
+    elif [ -n "$filespec" ]; then
+	local -r targetFilespec="$filespec"
+	if [ "$isKeepExtension" ]; then
+	    local backupFilespec; backupFilespec="$(fileExtension --splice ".${WRITEORIG_EXT}" -- "$filespec")" || return 3
+	else
+	    local -r backupFilespec="${filespec}.${WRITEORIG_EXT}"
+	fi
+    elif [ "$1" = / ]; then
+	echo >&2 'ERROR: Cannot restore root directory.'
+	return 1
+    else
+	echo >&2 'ERROR: No FILE specified.'
+	return 1
+    fi
+
+    if [ ! -e "$backupFilespec" ]; then
+	printf >&2 'ERROR: "%s" does not exist!\n' "$backupFilespec"
+	return 1
+    elif [ ! -r "$backupFilespec" ]; then
+	printf >&2 'ERROR: "%s" is not readable!\n' "$backupFilespec"
+	return 1
+    fi
+
+    if [ -n "$destinationDir" ]; then
+	local -r rebasedFilespec="${destinationDir}$(basename -- "${targetFilespec}")"
+    else
+	local -r rebasedFilespec="${targetFilespec}"
+    fi
+
+    if [ "$targetFilespec" = "$lastTargetFilespec" ]; then
+	# Don't process twice when both FILE and FILE.orig are passed.
+	return 0
+    fi; lastTargetFilespec="$targetFilespec"
+
+    local action='Restored'; [ "$restoreCommand" = : ] && action='Would restore'
+    local what=''
+    local postCommand=$defaultPostCommand
+    typeset -a cpMvDirArgs=()
+    if [ -d "$backupFilespec" ]; then
+	what='directory'
+	cpMvDirArgs=(--no-target-directory)
+	case "$restoreCommand" in
+	    cp)	cpMvDirArgs+=(--recursive);;
+	    mv)	if [ -d "$rebasedFilespec" ]; then
+		    # XXX: mv cannot move a directory into an existing directory with the same name.
+		    # Copy and then remove the backup directory instead.
+		    restoreCommand=cp
+		    cpMvDirArgs+=(--recursive)
+		    postCommand=removeBackup
+		fi
+		;;
+	esac
+    fi
+    $restoreCommand "${cpMvArgs[@]}" "${cpMvDirArgs[@]}" -- "$backupFilespec" "$rebasedFilespec" \
+	&& ${postCommand:-:} "$backupFilespec" "$rebasedFilespec" \
+	|| return $?
+    printRestoreFile "${action}${what:+ }${what}" "$rebasedFilespec"
+    return 0
+}
+
+
+isSuccess=
+isFailure=
+for filespec
+do
+    restorebackup "$filespec"
+    case $? in
+	0)  isSuccess=t;;
+	99) ;;
+	*)  isFailure=t;;
+    esac
+done
+
+if [ "$isFailure" ]; then
+    [ "$isSuccess" ] && exit 6 || exit 1
+elif [ "$isSuccess" ]; then
+    exit 0
+else
+    exit 99
+fi
