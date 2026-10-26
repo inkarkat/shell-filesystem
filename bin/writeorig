@@ -23,42 +23,38 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Write a single backup of FILE to FILE.${WRITEORIG_EXT}. Ignores *.${WRITEORIG_EXT} files.
+Write a single backup of FILE / DIR to FILE.${WRITEORIG_EXT} / DIR.${WRITEORIG_EXT}
+Ignores *.${WRITEORIG_EXT} files.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
-    --overwrite|-f		Overwrite an existing backup.
-    --once-today		Overwrite an existing backup if that backup was
-				made on an earlier day, but not when it was made
-				today.
-    --keep|-k			Do nothing if the backup already exists
-				(default behavior), and succeed instead.
-    --keep-extension|-x		Insert .${WRITEORIG_EXT} before the file
-				extension of FILE, i.e.
-				FILE.${WRITEORIG_EXT}.ext instead of
-				FILE.ext.${WRITEORIG_EXT}
-    --backup-dir|-d DIR		Create backups in DIR instead of in the same
-				directory as the original FILE.
-    --delete-original		Removes the original FILE after creating
-				FILE.${WRITEORIG_EXT}; you can use this for a final backup
-				before getting rid of the FILE.
-    --ignore-no-files		Do not complain when no FILE(s) have been
-				passed. Useful when passing a glob that may
-				resolve to no files at all, and that is
-				acceptable.
-    --get-extension		Just print the .${WRITEORIG_EXT} backup extension (or
-				nothing if --keep and a backup already exists).
-    --accept-nonexisting	Do not print an error if FILE does not exist,
-				but simply print the would-be backup extension.
-				Useful for direct-backup use cases where there's
-				either no original FILE or it is located
-				somewhere else. If you'd rather not create a
-				backup if FILE does not exist yet, just
-				suppress stderr and use the empty output (e.g.
-				with sed -i\$backupExtension) or react on the
-				exit status 1.
+    --overwrite|-f	Overwrite an existing backup.
+    --once-today	Overwrite an existing backup if that backup was made on
+			an earlier day, but not when it was made today.
+    --keep|-k		Do nothing if the backup already exists (default
+			behavior), and succeed instead.
+    --keep-extension|-x	Insert .${WRITEORIG_EXT} before the file extension of FILE,
+			i.e. FILE.${WRITEORIG_EXT}.ext instead of FILE.ext.${WRITEORIG_EXT}
+    --backup-dir|-d DIR	Create backups in DIR instead of in the same directory
+			as the original FILE.
+    --delete-original	Removes the original FILE after creating FILE.${WRITEORIG_EXT};
+			you can use this for a final backup before getting rid
+			of the FILE.
+    --ignore-no-files	Do not complain when no FILE(s) have been passed. Useful
+			when passing a glob that may resolve to no files at all,
+			and that is acceptable.
+    --get-extension	Just print the .${WRITEORIG_EXT} backup extension (or nothing
+			if --keep and a backup already exists).
+    --accept-nonexisting
+			Do not print an error if FILE does not exist, but simply
+			print the would-be backup extension. Useful for
+			direct-backup use cases where there's either no original
+			FILE or it is located somewhere else. If you'd rather
+			not create a backup if FILE does not exist yet, just
+			suppress stderr and use the empty output (e.g. with sed
+			-i\$backupExtension) or react on the exit status 1.
 EXIT STATUS:
     0	Complete success, or backup already exists and -k|--keep is given, or
 	the backup is from today and --once-today is given.
