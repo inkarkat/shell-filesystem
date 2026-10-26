@@ -17,9 +17,9 @@
 
 printShortUsage()
 {
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-1|--each|-a|--archive] -n|--name NAME [--archive-program "zip -9 -r" --archive-extension .zip] [-C|--on-conflict ask|backup|increment|error|overwrite|overwrite?|update] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-p|--parents] [-D|--delete-original] [--] FILE [...] [--help|-h|-?]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-1|--each|-a|--archive] -n|--name NAME [--archive-program "zip -9 -r" --archive-extension .zip] [-C|--on-conflict ask|backup|increment|error|overwrite|overwrite?|update] [--basedir BASEDIR|--base-type config|data|runtime|cache|temp] [--backup-dir|-d DIR] [-p|--parents] [-D|--delete-original] [--] FILE|DIR [...] [--help|-h|-?]'
     echo
-    printf 'Usage: backupFilespec=$(%q %s)\n' "$(basename "$1")" '[...] [--] FILE [...]'
+    printf 'Usage: backupFilespec=$(%q %s)\n' "$(basename "$1")" '[...] [--] FILE|DIR [...]'
 }
 printUsage()
 {
@@ -33,8 +33,8 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Write backup of FILE(s) as a zipped archive file (or named copy in case of a
-single FILE).
+Write backup of FILE(s) / DIR(s) as a zipped archive file (or named copy in case
+of a single FILE).
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -256,9 +256,9 @@ archiveAndBackup()
     (
 	cd "${baseDirspec}" || exit 1
 	if eval "${archiveProgram}" '"${backupFilespec}" "${archivedFiles[@]}"' "$archiveRedirect"; then
-	    printBackupFile "${backupDirspec:-${baseDirspec}/}${name}${counter:+ (${counter})}${archiveExtension}"
+	    printBackupFile "${backupDirspec:-${baseDirspec}}${name}${counter:+ (${counter})}${archiveExtension}"
 	else
-	    printf >&2 'ERROR: Could not create archive: %s\n' "${backupDirspec:-${baseDirspec}/}${name}${counter:+ (${counter})}${archiveExtension}"
+	    printf >&2 'ERROR: Could not create archive: %s\n' "${backupDirspec:-${baseDirspec}}${name}${counter:+ (${counter})}${archiveExtension}"
 	    exit 1
 	fi
     )
