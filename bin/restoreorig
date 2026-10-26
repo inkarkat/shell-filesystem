@@ -53,9 +53,10 @@ HELPTEXT
 
 isKeepExtension=
 destinationDir=
+action='Restored'
 restoreCommand=cp
 defaultPostCommand=checkRestore
-typeset -a cpMvArgs=(--interactive)
+typeset -a restoreCommandArgs=(--interactive)
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -75,8 +76,8 @@ do
 			shift; restoreCommand=mv;;
 	--force|-f)	defaultPostCommand='';;&
 	--interactive|-i|--no-clobber|-n)
-			cpMvArgs=("$1"); shift;;
-	--dry-run|-N)	shift; restoreCommand=:;;
+			restoreCommandArgs=("$1"); shift;;
+	--dry-run|-N)	shift; restoreCommand=:; action='Would restore';;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -165,26 +166,25 @@ restorebackup()
 	local -r rebasedFilespec="${targetFilespec}"
     fi
 
-    local action='Restored'; [ "$restoreCommand" = : ] && action='Would restore'
     local what=''
     local postCommand=$defaultPostCommand
-    typeset -a cpMvDirArgs=()
+    typeset -a restoreCommandDirArgs=()
     if [ -d "$backupFilespec" ]; then
 	what='directory'
-	cpMvDirArgs=(--no-target-directory)
 	case "$restoreCommand" in
-	    cp)	cpMvDirArgs+=(--recursive);;
-	    mv)	if [ -d "$rebasedFilespec" ]; then
+	    cp)	restoreCommandDirArgs=(--no-target-directory --recursive);;
+	    mv)	restoreCommandDirArgs=(--no-target-directory)
+		if [ -d "$rebasedFilespec" ]; then
 		    # XXX: mv cannot move a directory into an existing directory with the same name.
 		    # Copy and then remove the backup directory instead.
 		    restoreCommand=cp
-		    cpMvDirArgs+=(--recursive)
+		    restoreCommandDirArgs+=(--recursive)
 		    postCommand=removeBackup
 		fi
 		;;
 	esac
     fi
-    $restoreCommand "${cpMvArgs[@]}" "${cpMvDirArgs[@]}" -- "$backupFilespec" "$rebasedFilespec" \
+    $restoreCommand "${restoreCommandArgs[@]}" "${restoreCommandDirArgs[@]}" -- "$backupFilespec" "$rebasedFilespec" \
 	&& ${postCommand:-:} "$backupFilespec" "$rebasedFilespec" \
 	|| return $?
     printRestoreFile "${action}${what:+ }${what}" "$rebasedFilespec"
