@@ -145,6 +145,11 @@ restorebackup()
 	echo >&2 'ERROR: No FILE specified.'
 	return 1
     fi
+    if [ "$targetFilespec" = "$lastTargetFilespec" ]; then
+	# Don't process twice when both FILE and FILE.orig are passed.
+	return 0
+    fi; lastTargetFilespec="$targetFilespec"
+
 
     if [ ! -e "$backupFilespec" ]; then
 	printf >&2 'ERROR: "%s" does not exist!\n' "$backupFilespec"
@@ -159,11 +164,6 @@ restorebackup()
     else
 	local -r rebasedFilespec="${targetFilespec}"
     fi
-
-    if [ "$targetFilespec" = "$lastTargetFilespec" ]; then
-	# Don't process twice when both FILE and FILE.orig are passed.
-	return 0
-    fi; lastTargetFilespec="$targetFilespec"
 
     local action='Restored'; [ "$restoreCommand" = : ] && action='Would restore'
     local what=''
