@@ -1,0 +1,55 @@
+#!/bin/bash
+
+: ${WRITEORIG_EXT:=orig}
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, they can
+    # skim the long one.
+    printf 'Usage: [WRITEORIG_EXT=orig] %q %s\n' "$(basename "$1")" "[-x|--keep-extension] [--] FILE[.${WRITEORIG_EXT}]|DIR[.${WRITEORIG_EXT}] [...] [-?|-h|--help]"
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Delete the single backup of FILE / DIR found at FILE.${WRITEORIG_EXT} / DIR.${WRITEORIG_EXT}
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --keep-extension|-x	Accept .${WRITEORIG_EXT} before the file extension of FILE,
+			i.e. FILE.${WRITEORIG_EXT}.ext instead of FILE.ext.${WRITEORIG_EXT}
+
+EXIT STATUS:
+    0	Complete success.
+    1	Failed to delete any backup(s) of FILE(s).
+    2   Bad invocation, wrong or missing command-line arguments
+    3	Internal error or failed assertion.
+    6	Partial success; some backups(s) could not be deleted.
+    99	No backups(s) were deleted.
+HELPTEXT
+}
+
+typeset -a restoreorigArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--keep-extension|-x)
+			restoreorigArgs+=("$1"); shift;;
+	--)		break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+
+exec restoreorig --only-delete-backup "${restoreorigArgs[@]}" "$@"

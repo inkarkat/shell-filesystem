@@ -78,6 +78,8 @@ do
 	--interactive|-i|--no-clobber|-n)
 			restoreCommandArgs=("$1"); shift;;
 	--dry-run|-N)	shift; restoreCommand=:; action='Would restore';;
+	--only-delete-backup)
+			shift; restoreCommand=removeBackup; restoreCommandArgs=(); action='Deleted backup of'; defaultPostCommand='';;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -96,6 +98,7 @@ printRestoreFile()
 
 removeBackup()
 {
+    [ "$1" = -- ] && shift
     ${defaultPostCommand:-:} "$@" || return $?
 
     local backupFilespec="${1:?}"; shift
