@@ -88,6 +88,12 @@ printRestoreFile()
     printf '%s%s\n' "${message}${message:+ }" "$filespec"
 }
 
+removeBackup()
+{
+    local backupFilespec="${1:?}"; shift
+    rm --recursive --force -- "$backupFilespec"
+}
+
 lastTargetFilespec=
 restorebackup()
 {
@@ -149,13 +155,13 @@ restorebackup()
 		    # Copy and then remove the backup directory instead.
 		    restoreCommand=cp
 		    cpMvDirArgs+=(--recursive)
-		    postCommand=rm
+		    postCommand=removeBackup
 		fi
 		;;
 	esac
     fi
     $restoreCommand "${cpMvArgs[@]}" "${cpMvDirArgs[@]}" -- "$backupFilespec" "$rebasedFilespec" \
-	&& ${postCommand:-:} --recursive --force -- "$backupFilespec" \
+	&& ${postCommand:-:} "$backupFilespec" "$rebasedFilespec" \
 	|| return 1
     printRestoreFile "${action}${what:+ }${what}" "$rebasedFilespec"
     return 0
