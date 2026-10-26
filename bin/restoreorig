@@ -1,5 +1,7 @@
 #!/bin/bash
 
+${DEBUG:+eval $(debugtrace -o $- -- "$@")}
+
 : ${WRITEORIG_EXT:=orig}
 
 printShortUsage()
@@ -189,6 +191,7 @@ restorebackup()
     return 0
 }
 
+${DEBUG:+eval $(debugtrace --point main -o $- --)}
 
 isSuccess=
 isFailure=
